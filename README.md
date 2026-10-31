@@ -23,7 +23,7 @@ ShopWiz only asks for card names. It never asks for card numbers.
 ## Run it
 
 ```bash
-pip install -r requirements.txt -r requirements-dev.txt
+pip install -r requirements.txt
 uvicorn app:app --reload
 ```
 
