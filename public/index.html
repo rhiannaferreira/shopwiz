@@ -14,9 +14,9 @@
   <link rel="stylesheet" href="skins.css">
   <script>
     (function () {
-      var skins = ["neon", "paper", "arcade", "aura", "terminal"], s = new URLSearchParams(location.search).get("skin");
+      var skins = ["aura", "neon", "paper", "arcade", "terminal"], s = new URLSearchParams(location.search).get("skin");
       try { s = s || localStorage.getItem("shopwiz.skin"); } catch (e) {}
-      document.documentElement.dataset.skin = skins.indexOf(s) >= 0 ? s : "neon";
+      document.documentElement.dataset.skin = skins.indexOf(s) >= 0 ? s : "aura";
     })();
   </script>
 </head>
@@ -28,10 +28,10 @@
     <a class="logo" href="#" aria-label="ShopWiz home"><span class="logo-chip"></span>SHOP<b>WIZ</b></a>
     <div class="top-right">
     <div class="skins" role="group" aria-label="Look">
+      <button data-skin="aura" title="Aura" aria-label="Aura look"></button>
       <button data-skin="neon" title="Neon" aria-label="Neon look"></button>
       <button data-skin="paper" title="Paper" aria-label="Paper look"></button>
       <button data-skin="arcade" title="Arcade" aria-label="Arcade look"></button>
-      <button data-skin="aura" title="Aura" aria-label="Aura look"></button>
       <button data-skin="terminal" title="Terminal" aria-label="Terminal look"></button>
     </div>
     <nav class="tabs" role="tablist">
