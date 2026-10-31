@@ -1,0 +1,14 @@
+{
+  "sample-bose-qcu": [
+    {"product_title": "Bose QuietComfort Ultra Headphones", "merchant": "Best Buy", "price": "$379.00", "link": "https://www.bestbuy.com/", "rating": 4.5, "reviews": 6120},
+    {"product_title": "Bose QuietComfort Ultra Headphones", "merchant": "Amazon.com", "price": "$399.00", "link": "https://www.amazon.com/", "rating": 4.4, "reviews": 9031},
+    {"product_title": "Bose QuietComfort Ultra Headphones", "merchant": "Target", "price": "$399.99", "link": "https://www.target.com/", "rating": 4.6, "reviews": 702},
+    {"product_title": "Bose QuietComfort Ultra Headphones (Renewed)", "merchant": "Walmart", "price": "$289.00", "link": "https://www.walmart.com/", "rating": 4.1, "reviews": 214}
+  ],
+  "sample-airpods-max": [
+    {"product_title": "Apple AirPods Max", "merchant": "Apple", "price": "$549.00", "link": "https://www.apple.com/", "rating": 4.4, "reviews": 9800},
+    {"product_title": "Apple AirPods Max", "merchant": "Amazon.com", "price": "$479.00", "link": "https://www.amazon.com/", "rating": 4.5, "reviews": 21455},
+    {"product_title": "Apple AirPods Max", "merchant": "Best Buy", "price": "$499.99", "link": "https://www.bestbuy.com/", "rating": 4.7, "reviews": 3310},
+    {"product_title": "Apple AirPods Max", "merchant": "Target", "price": "$499.99", "link": "https://www.target.com/", "rating": 4.6, "reviews": 1204}
+  ]
+}

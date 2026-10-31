@@ -1,0 +1,6 @@
+[
+  {"id": "s1", "store_key": "best buy", "store": "Best Buy", "percent": null, "amount": 25, "min_spend": 250, "code": "TECH25", "expires": "2026-11-15", "personal": true, "subject": "Your $25 off $250 member reward is ready"},
+  {"id": "s2", "store_key": "target", "store": "Target", "percent": 10, "amount": null, "min_spend": null, "code": null, "expires": "2026-11-08", "personal": false, "subject": "10% off electronics with Target Circle this week"},
+  {"id": "s3", "store_key": "walmart", "store": "Walmart", "percent": null, "amount": 10, "min_spend": 50, "code": "SAVE10NOW", "expires": "2026-11-03", "personal": false, "subject": "$10 off orders of $50+ with code SAVE10NOW"},
+  {"id": "s4", "store_key": null, "store": "Sephora", "percent": 20, "amount": null, "min_spend": null, "code": "BDAY20", "expires": "2026-11-30", "personal": true, "subject": "Happy birthday! 20% off, just for you"}
+]

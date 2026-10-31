@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ShopWiz</title>
+  <meta name="description" content="Find the lowest real price for anything you buy, after the best card in your wallet.">
+  <meta name="theme-color" content="#07070a">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='6' y='14' width='52' height='36' rx='7' fill='%2307070a'/%3E%3Crect x='6' y='22' width='52' height='7' fill='%23d4ff3a'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;800;900&family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;800&family=Instrument+Serif:ital@0;1&family=Silkscreen:wght@400;700&family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400..600&family=IBM+Plex+Mono:wght@400;600;700&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="skins.css">
+  <script>
+    (function () {
+      var skins = ["neon", "paper", "arcade", "aura", "terminal"], s = new URLSearchParams(location.search).get("skin");
+      try { s = s || localStorage.getItem("shopwiz.skin"); } catch (e) {}
+      document.documentElement.dataset.skin = skins.indexOf(s) >= 0 ? s : "neon";
+    })();
+  </script>
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+  <div class="glow" aria-hidden="true"></div>
+
+  <header class="top">
+    <a class="logo" href="#" aria-label="ShopWiz home"><span class="logo-chip"></span>SHOP<b>WIZ</b></a>
+    <div class="top-right">
+    <div class="skins" role="group" aria-label="Look">
+      <button data-skin="neon" title="Neon" aria-label="Neon look"></button>
+      <button data-skin="paper" title="Paper" aria-label="Paper look"></button>
+      <button data-skin="arcade" title="Arcade" aria-label="Arcade look"></button>
+      <button data-skin="aura" title="Aura" aria-label="Aura look"></button>
+      <button data-skin="terminal" title="Terminal" aria-label="Terminal look"></button>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button role="tab" aria-selected="true" data-tab="shop">Shop</button>
+      <button role="tab" aria-selected="false" data-tab="guide">Card cheat sheet</button>
+    </nav>
+    </div>
+  </header>
+
+  <div id="sample-banner" class="banner" hidden><span class="dot"></span>Sample mode: made-up prices and reviews so you can try it. Add an Apify token for live stores.</div>
+
+  <main>
+    <section id="tab-shop">
+      <div class="hero">
+        <div class="hero-copy">
+          <p class="kicker">Your cards × every store × real reviews</p>
+          <h1>Never overpay for <span class="rotor" aria-live="off"><span id="rotor-word">headphones</span></span></h1>
+          <p class="lede">Say what you want. ShopWiz checks the stores, picks the card in your wallet that pays you most at each one, and shows the price you <em>actually</em> pay.</p>
+          <form id="search" class="search" autocomplete="off">
+            <span class="search-icon" aria-hidden="true">⌕</span>
+            <input id="q" name="q" type="search" placeholder="noise cancelling headphones under $400" aria-label="What are you shopping for?" maxlength="300">
+            <button type="submit"><span>Find it</span></button>
+          </form>
+          <div class="examples" id="examples">
+            <button type="button">noise cancelling headphones under $400</button>
+            <button type="button">air fryer 4.5 stars+</button>
+            <button type="button">robot vacuum under $400</button>
+          </div>
+          <p id="intent" class="intent" hidden></p>
+        </div>
+        <div class="hero-wallet" aria-label="Your wallet">
+          <div id="fan" class="fan"></div>
+          <button id="edit-wallet" class="pill">＋ Edit wallet</button>
+          <p class="fine">Card names only. Never card numbers.</p>
+        </div>
+      </div>
+
+      <div class="ticker" aria-hidden="true"><div class="ticker-track" id="ticker"></div></div>
+
+      <section id="inbox" class="inbox" aria-label="Deals from your inbox">
+        <div class="inbox-head">
+          <div>
+            <p class="kicker">Inbox deals</p>
+            <h2 class="inbox-title">Coupons you already have</h2>
+            <p class="fine" id="inbox-sub">Connect Gmail and ShopWiz reads your promotions for codes, rewards and offers made for you, then counts them in every price.</p>
+          </div>
+          <div class="inbox-actions" id="inbox-actions"></div>
+        </div>
+        <div id="coupons" class="coupons"></div>
+      </section>
+
+      <section id="results" class="results" hidden>
+        <h2 class="section-title"><span class="num">01</span> Pick the one you want</h2>
+        <div id="products" class="products"></div>
+      </section>
+
+      <section id="deal-wrap" hidden>
+        <h2 class="section-title"><span class="num">02</span> Here's how to pay least</h2>
+        <div id="deal" class="deal"></div>
+      </section>
+    </section>
+
+    <section id="tab-guide" hidden>
+      <div class="hero solo">
+        <div class="hero-copy">
+          <p class="kicker">Your wallet, decoded</p>
+          <h1>Which card <span class="hl">when.</span></h1>
+          <p class="lede">The card that pays you most in every kind of store, and your backup.</p>
+        </div>
+      </div>
+      <div id="guide" class="guide"></div>
+    </section>
+  </main>
+
+  <dialog id="wallet-dialog">
+    <form method="dialog" class="sheet">
+      <div class="sheet-head">
+        <h2>Your wallet</h2>
+        <button class="pill" value="close">Done</button>
+      </div>
+      <input id="card-filter" type="search" placeholder="Search 19 cards" aria-label="Search cards">
+      <div id="card-list" class="card-list"></div>
+      <h3>Power-ups</h3>
+      <label class="toggle"><input type="checkbox" id="portal"><span class="sw"></span> Stack cash back portal rewards (estimate)</label>
+      <label class="toggle"><input type="checkbox" data-member="costco"><span class="sw"></span> I have a Costco membership</label>
+      <label class="toggle"><input type="checkbox" data-member="sam's club"><span class="sw"></span> I have a Sam's Club membership</label>
+      <label class="field">Chasing a sign-up bonus?
+        <select id="bonus-card"><option value="">No</option></select>
+      </label>
+      <label class="field" id="bonus-left-wrap" hidden>Spend left to earn it ($)
+        <input id="bonus-left" type="number" min="0" step="50" inputmode="numeric">
+      </label>
+    </form>
+  </dialog>
+
+  <footer class="foot">
+    <span class="logo small"><span class="logo-chip"></span>SHOP<b>WIZ</b></span>
+    <span id="as-of"></span>
+    <span>Rewards are estimates. Check your card's terms.</span>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

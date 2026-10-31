@@ -1,0 +1,8 @@
+[
+  {"product_title": "Sony WH-1000XM5", "merchant": "Amazon.com", "price": "$299.99", "link": "https://www.amazon.com/dp/B09XS7JWHH", "rating": 4.6, "reviews": 18342},
+  {"product_title": "Sony WH-1000XM5", "merchant": "Best Buy", "price": "$319.99", "link": "https://www.bestbuy.com/", "rating": 4.7, "reviews": 4210},
+  {"product_title": "Sony WH-1000XM5", "merchant": "Walmart", "price": "$324.00", "link": "https://www.walmart.com/", "rating": 4.5, "reviews": 1302},
+  {"product_title": "Sony WH-1000XM5", "merchant": "Target", "price": "$329.99", "link": "https://www.target.com/", "rating": 4.6, "reviews": 880},
+  {"product_title": "Sony WH-1000XM5", "merchant": "Costco", "price": "$309.99", "link": "https://www.costco.com/", "rating": 4.8, "reviews": 512},
+  {"product_title": "Sony WH-1000XM5", "merchant": "eBay - techdeals", "price": "$289.00", "link": "https://www.ebay.com/", "rating": null, "reviews": 0, "condition": "Used - Like New"}
+]

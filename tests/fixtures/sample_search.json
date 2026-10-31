@@ -1,0 +1,41 @@
+[
+ {
+  "type": "product",
+  "title": "Sony WH-1000XM5 Wireless Noise Canceling Headphones",
+  "price": "$299.99",
+  "price_value": 299.99,
+  "merchant": "Amazon.com",
+  "rating": 4.6,
+  "reviews": 18342,
+  "catalog_id": "sample-sony-xm5",
+  "product_id": "p1",
+  "link": "https://www.amazon.com/dp/B09XS7JWHH",
+  "image": ""
+ },
+ {
+  "type": "product",
+  "title": "Bose QuietComfort Ultra Headphones",
+  "price": "$379.00",
+  "price_value": 379.0,
+  "merchant": "Best Buy",
+  "rating": 4.5,
+  "reviews": 6120,
+  "catalog_id": "sample-bose-qcu",
+  "product_id": "p2",
+  "link": "https://www.bestbuy.com/",
+  "image": ""
+ },
+ {
+  "type": "product",
+  "title": "Apple AirPods Max",
+  "price": "$479.00",
+  "price_value": 479.0,
+  "merchant": "Amazon.com",
+  "rating": 4.4,
+  "reviews": 9800,
+  "catalog_id": "sample-airpods-max",
+  "product_id": "p3",
+  "link": "https://www.apple.com/",
+  "image": ""
+ }
+]

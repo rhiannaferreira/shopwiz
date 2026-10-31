@@ -1,0 +1,21 @@
+{
+  "as_of": "2026-10-31",
+  "_note": "Typical cash back portal rates for electronics and general merchandise. Portal rates change often and some categories are excluded, so the app labels these as estimates. Update by hand or replace with a scraped feed.",
+  "portal": "Rakuten",
+  "rates": {
+    "best buy": 1.0,
+    "target": 1.0,
+    "walmart": 0.0,
+    "amazon": 0.0,
+    "costco": 0.0,
+    "ebay": 1.0,
+    "newegg": 1.5,
+    "home depot": 1.0,
+    "lowe's": 1.0,
+    "b&h photo": 1.0,
+    "dick's": 3.0,
+    "walgreens": 2.0,
+    "cvs": 2.0,
+    "apple": 0.0
+  }
+}

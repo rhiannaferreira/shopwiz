@@ -1,0 +1,295 @@
+{
+  "_note": "How each store's purchases are usually categorized by card issuers when you buy online. Superstores and warehouse clubs usually do NOT count as supermarkets.",
+  "merchants": {
+    "amazon": {
+      "names": [
+        "amazon",
+        "amazon.com"
+      ],
+      "categories": [
+        "amazon",
+        "online_retail"
+      ],
+      "returns": {
+        "days": 30,
+        "electronics_days": 30
+      }
+    },
+    "walmart": {
+      "names": [
+        "walmart",
+        "walmart.com"
+      ],
+      "categories": [
+        "walmart",
+        "walmart_online",
+        "online_retail",
+        "superstore"
+      ],
+      "returns": {
+        "days": 90,
+        "electronics_days": 30
+      }
+    },
+    "target": {
+      "names": [
+        "target",
+        "target.com"
+      ],
+      "categories": [
+        "target",
+        "online_retail",
+        "superstore"
+      ],
+      "price_match": [
+        "amazon",
+        "walmart",
+        "best buy",
+        "home depot",
+        "lowe's"
+      ],
+      "returns": {
+        "days": 90,
+        "electronics_days": 30
+      }
+    },
+    "best buy": {
+      "names": [
+        "best buy",
+        "bestbuy",
+        "bestbuy.com"
+      ],
+      "categories": [
+        "online_retail",
+        "electronics"
+      ],
+      "price_match": [
+        "amazon",
+        "walmart",
+        "target",
+        "newegg",
+        "b&h photo",
+        "apple",
+        "dell"
+      ],
+      "returns": {
+        "days": 15,
+        "electronics_days": 15
+      }
+    },
+    "costco": {
+      "names": [
+        "costco",
+        "costco.com"
+      ],
+      "categories": [
+        "costco",
+        "warehouse",
+        "online_retail"
+      ],
+      "networks": [
+        "visa",
+        "mastercard",
+        "discover"
+      ],
+      "returns": {
+        "days": null,
+        "electronics_days": 90
+      },
+      "membership": {
+        "name": "Costco",
+        "surcharge_pct": 5,
+        "note": "Non-members pay a 5% surcharge on Costco.com"
+      }
+    },
+    "sam's club": {
+      "names": [
+        "sam's club",
+        "samsclub",
+        "sams club"
+      ],
+      "categories": [
+        "warehouse",
+        "online_retail"
+      ],
+      "returns": {
+        "days": null,
+        "electronics_days": 90
+      },
+      "membership": {
+        "name": "Sam's Club",
+        "surcharge_pct": null,
+        "note": "Needs a Sam's Club membership"
+      }
+    },
+    "ebay": {
+      "names": [
+        "ebay",
+        "ebay.com"
+      ],
+      "categories": [
+        "online_retail"
+      ],
+      "returns": {
+        "days": 30,
+        "electronics_days": 30
+      }
+    },
+    "newegg": {
+      "names": [
+        "newegg",
+        "newegg.com"
+      ],
+      "categories": [
+        "online_retail",
+        "electronics"
+      ],
+      "returns": {
+        "days": 30,
+        "electronics_days": 30
+      }
+    },
+    "apple": {
+      "names": [
+        "apple",
+        "apple.com",
+        "apple store"
+      ],
+      "categories": [
+        "apple",
+        "online_retail"
+      ],
+      "returns": {
+        "days": 14,
+        "electronics_days": 14
+      }
+    },
+    "home depot": {
+      "names": [
+        "home depot",
+        "the home depot",
+        "homedepot.com"
+      ],
+      "categories": [
+        "home_improvement",
+        "online_retail"
+      ],
+      "price_match": [
+        "lowe's"
+      ],
+      "returns": {
+        "days": 90,
+        "electronics_days": 90
+      }
+    },
+    "lowe's": {
+      "names": [
+        "lowe's",
+        "lowes",
+        "lowes.com"
+      ],
+      "categories": [
+        "home_improvement",
+        "online_retail"
+      ],
+      "price_match": [
+        "home depot"
+      ],
+      "returns": {
+        "days": 90,
+        "electronics_days": 90
+      }
+    },
+    "whole foods": {
+      "names": [
+        "whole foods",
+        "whole foods market"
+      ],
+      "categories": [
+        "whole_foods",
+        "supermarket"
+      ],
+      "returns": {
+        "days": 30,
+        "electronics_days": 30
+      }
+    },
+    "kroger": {
+      "names": [
+        "kroger"
+      ],
+      "categories": [
+        "supermarket"
+      ],
+      "returns": {
+        "days": 30,
+        "electronics_days": 30
+      }
+    },
+    "walgreens": {
+      "names": [
+        "walgreens",
+        "walgreens.com"
+      ],
+      "categories": [
+        "drugstore",
+        "online_retail"
+      ],
+      "returns": {
+        "days": 30,
+        "electronics_days": 30
+      }
+    },
+    "cvs": {
+      "names": [
+        "cvs",
+        "cvs pharmacy",
+        "cvs.com"
+      ],
+      "categories": [
+        "drugstore",
+        "online_retail"
+      ],
+      "returns": {
+        "days": 60,
+        "electronics_days": 60
+      }
+    },
+    "b&h photo": {
+      "names": [
+        "b&h",
+        "b&h photo",
+        "b&h photo-video-audio",
+        "bhphotovideo"
+      ],
+      "categories": [
+        "online_retail",
+        "electronics"
+      ],
+      "returns": {
+        "days": 30,
+        "electronics_days": 30
+      }
+    },
+    "dick's": {
+      "names": [
+        "dick's sporting goods",
+        "dicks sporting goods"
+      ],
+      "categories": [
+        "online_retail"
+      ],
+      "returns": {
+        "days": 60,
+        "electronics_days": 60
+      }
+    }
+  },
+  "default": {
+    "categories": [
+      "online_retail"
+    ]
+  },
+  "_price_match_note": "Stores that match competitors' prices on identical in-stock items sold by the competitor itself (not marketplace sellers). Policies as of 2026-10-31; check the store's policy page before asking.",
+  "_returns_note": "Standard return windows in days as of 2026-10-31 (null = no set limit). Paid memberships (My Best Buy Plus/Total) and holiday windows can be longer; Target Circle Card purchases get 30 extra days. Check the store's policy."
+}
