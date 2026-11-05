@@ -43,6 +43,8 @@ uvicorn app:app --reload
 | `ANTHROPIC_API_KEY`, `SHOPWIZ_AI_MODEL` | Optional: API key and a small model id, for harder search requests and review summaries |
 | `SHOPWIZ_SHOPPING_ACTOR` | Google Shopping actor (default `experthasan~google-shopping-scraper`) |
 | `SHOPWIZ_REVIEWS_ACTOR` | Amazon reviews actor (default `junglee~amazon-reviews-scraper`) |
+| `SHOPWIZ_VISITOR_LIMIT` | Live (uncached) lookups one visitor can make per hour (default 15) |
+| `SHOPWIZ_DAILY_LIMIT` | Live lookups the whole site can make per day (default 300) |
 
 ### Gmail setup
 
@@ -56,6 +58,12 @@ uvicorn app:app --reload
 ### Cost
 
 Searches ask for 20 products and results are cached for an hour. A search costs a few cents. Reviews are only fetched for Amazon listings, capped at 100 per product.
+
+## Hosting
+
+The repo deploys to Vercel as is (`vercel.json` sets the FastAPI preset). Add `APIFY_TOKEN` under Project Settings > Environment Variables and redeploy. Until then the site runs in sample mode.
+
+A public site spends your Apify credit, so ShopWiz limits uncached lookups per visitor and per day. Those counters are in memory and reset when the server restarts, so also set a monthly usage limit in Apify (Settings > Usage limits) as the hard cap.
 
 ## Tests
 

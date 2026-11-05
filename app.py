@@ -37,10 +37,39 @@ def live() -> bool:
     return bool(os.environ.get("APIFY_TOKEN"))
 
 
-def cached(key: tuple, fetch):
+# Spending guards for a public site: every uncached Apify call costs money, so cap how many
+# one visitor and the whole site can make. Cached results are free and don't count.
+# These counters live in memory, so they reset when the server restarts. Also set a
+# monthly usage limit in your Apify account settings as the hard cap.
+PER_VISITOR_HOUR = int(os.environ.get("SHOPWIZ_VISITOR_LIMIT", "15"))
+SITE_PER_DAY = int(os.environ.get("SHOPWIZ_DAILY_LIMIT", "300"))
+_spend: dict[str, list[float]] = {}
+
+
+def visitor(request: Request | None) -> str:
+    if request is None:
+        return "local"
+    fwd = request.headers.get("x-forwarded-for", "")
+    return fwd.split(",")[0].strip() or (request.client.host if request.client else "unknown")
+
+
+def spend(who: str) -> None:
+    now = time.time()
+    mine = [t for t in _spend.get(who, []) if now - t < 3600]
+    site = [t for t in _spend.get("*", []) if now - t < 86400]
+    if len(site) >= SITE_PER_DAY:
+        raise HTTPException(429, "ShopWiz has hit its daily limit for live price checks. Try again tomorrow.")
+    if len(mine) >= PER_VISITOR_HOUR:
+        raise HTTPException(429, "You've done a lot of live checks this hour. Try again in a bit.")
+    _spend[who], _spend["*"] = mine + [now], site + [now]
+
+
+def cached(key: tuple, fetch, who: str | None = None):
     hit = _cache.get(key)
     if hit and time.time() - hit[0] < CACHE_SECONDS:
         return hit[1]
+    if who is not None:
+        spend(who)
     value = fetch()
     _cache[key] = (time.time(), value)
     return value
@@ -107,7 +136,7 @@ def cards():
 
 
 @app.get("/api/search")
-def search(q: str):
+def search(q: str, request: Request):
     q = q.strip()
     if not q or len(q) > 300:
         raise HTTPException(400, "Type what you're shopping for.")
@@ -117,7 +146,10 @@ def search(q: str):
     else:
         try:
             products = cached(("search", intent["query"].lower(), intent.get("max_price")),
-                              lambda: apify.search_products(intent["query"], max_price=intent.get("max_price")))
+                              lambda: apify.search_products(intent["query"], max_price=intent.get("max_price")),
+                              visitor(request))
+        except HTTPException:
+            raise
         except Exception:
             raise HTTPException(502, "Couldn't search stores right now. Try again in a moment.")
     return {"sample": not live(), "intent": intent, "products": _filter(products, intent)}
@@ -141,7 +173,7 @@ def _filter(products: list[dict], intent: dict) -> list[dict]:
 
 
 @app.post("/api/deal")
-def deal(req: DealRequest):
+def deal(req: DealRequest, request: Request):
     wallet = wallet_or_400(req.cards)
     rotating = set(req.rotating)
     reviews, review_url = None, None
@@ -153,13 +185,15 @@ def deal(req: DealRequest):
             raise HTTPException(400, "Pick a product first.")
         try:
             offers = cached(("offers", req.catalog_id, req.product_id),
-                            lambda: apify.product_offers(req.catalog_id, req.product_id))
+                            lambda: apify.product_offers(req.catalog_id, req.product_id), visitor(request))
+        except HTTPException:
+            raise
         except Exception:
             raise HTTPException(502, "Couldn't get store prices right now. Try again in a moment.")
         review_url = req.review_url or next((o["link"] for o in offers if "amazon." in str(o.get("link"))), None)
         if review_url and "amazon." in review_url:
             try:
-                reviews = cached(("reviews", review_url), lambda: apify.amazon_reviews(review_url))
+                reviews = cached(("reviews", review_url), lambda: apify.amazon_reviews(review_url), visitor(request))
             except Exception:
                 reviews = None  # the rating still works from store ratings alone
     prices = {catalog.store(o["merchant"]).key: parse_price(o.get("price_value", o.get("price"))) or 0

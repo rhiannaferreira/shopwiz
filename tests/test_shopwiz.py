@@ -216,3 +216,22 @@ def test_coupons_change_the_best_deal():
     assert walmart["coupon_off"] == 10
     assert client.get("/api/coupons", params={"demo": True}).json()["sample"] is True
     assert client.get("/api/coupons").json() == {"connected": False, "sample": False, "available": False, "coupons": []}
+
+
+def test_spending_guard_caps_uncached_live_calls(monkeypatch):
+    import app as shop
+    from fastapi import HTTPException
+    monkeypatch.setattr(shop, "PER_VISITOR_HOUR", 2)
+    monkeypatch.setattr(shop, "_spend", {})
+    monkeypatch.setattr(shop, "_cache", {})
+    calls = []
+    for i in range(2):
+        shop.cached(("t", i), lambda: calls.append(1), "1.2.3.4")
+    shop.cached(("t", 0), lambda: calls.append(1), "1.2.3.4")  # cached, so free
+    try:
+        shop.cached(("t", 9), lambda: calls.append(1), "1.2.3.4")
+        raise AssertionError("expected the limit")
+    except HTTPException as e:
+        assert e.status_code == 429
+    assert len(calls) == 2
+    shop.cached(("t", 9), lambda: calls.append(1), "5.6.7.8")  # a different visitor still works
