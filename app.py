@@ -7,6 +7,7 @@ Without APIFY_TOKEN the app runs on built-in sample data so you can try the inte
 import hashlib
 import json
 import os
+import re
 import secrets
 import time
 from pathlib import Path
@@ -26,7 +27,8 @@ from shopwiz.ratings import aspects, suspicious, trust_rating
 ROOT = Path(__file__).parent
 PUBLIC = ROOT / "public"
 SAMPLES = ROOT / "tests" / "fixtures"
-CACHE_SECONDS = 3600  # prices move, so cached results expire after an hour
+CACHE_SECONDS = 3600
+BUNDLE = re.compile(r"\b(bundle|kit|combo|protection plan|with (?:power bank|stand|case)|\+)|\s\+\s", re.I)  # prices move, so cached results expire after an hour
 
 app = FastAPI(title="ShopWiz")
 catalog = Catalog()
@@ -169,6 +171,10 @@ def _filter(products: list[dict], intent: dict) -> list[dict]:
             continue
         seen.add(key)
         out.append(p)
+    # Bundles and kits ("+ earbuds", "with stand", "protection plan") go below the plain product,
+    # unless the shopper asked for a bundle.
+    if not BUNDLE.search(intent.get("query", "")):
+        out.sort(key=lambda p: bool(BUNDLE.search(p.get("title", ""))))
     return out
 
 

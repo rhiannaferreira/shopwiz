@@ -235,3 +235,11 @@ def test_spending_guard_caps_uncached_live_calls(monkeypatch):
         assert e.status_code == 429
     assert len(calls) == 2
     shop.cached(("t", 9), lambda: calls.append(1), "5.6.7.8")  # a different visitor still works
+
+
+def test_bundles_sort_below_the_plain_product():
+    from app import _filter
+    items = [{"title": "Sony XM5 Bundle with Stand", "catalog_id": "a"}, {"title": "Sony XM5 + JBL earbuds", "catalog_id": "b"},
+             {"title": "Sony XM5 Headphones", "catalog_id": "c"}]
+    assert _filter(items, {"query": "sony xm5"})[0]["catalog_id"] == "c"
+    assert _filter(items, {"query": "sony xm5 bundle"})[0]["catalog_id"] == "a"
