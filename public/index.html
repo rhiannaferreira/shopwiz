@@ -36,6 +36,7 @@
     </div>
     <nav class="tabs" role="tablist">
       <button role="tab" aria-selected="true" data-tab="shop">Shop</button>
+      <button role="tab" aria-selected="false" data-tab="wish">Wishlist <span class="count" id="wish-count" hidden></span></button>
       <button role="tab" aria-selected="false" data-tab="guide">Card cheat sheet</button>
     </nav>
     </div>
@@ -92,6 +93,27 @@
         <h2 class="section-title"><span class="num">02</span> Here's how to pay least</h2>
         <div id="deal" class="deal"></div>
       </section>
+    </section>
+
+    <section id="tab-wish" hidden>
+      <div class="hero solo">
+        <div class="hero-copy">
+          <p class="kicker">Buy now or wait</p>
+          <h1>Your wishlist, <span class="hl">judged.</span></h1>
+          <p class="lede">ShopWiz checks each item against today's store prices, what you've seen it cost, and the sale calendar, then tells you what to buy today and what's worth waiting for.</p>
+        </div>
+      </div>
+      <div id="market" class="market" aria-label="Sale calendar"></div>
+      <div class="wish-bar">
+        <label class="field">Spend up to ($)
+          <input id="wish-budget" type="number" min="0" step="50" inputmode="numeric" placeholder="No limit">
+        </label>
+        <button id="wish-check" class="pill strong" type="button">Check the market</button>
+        <span class="fine" id="wish-note"></span>
+      </div>
+      <div id="wish-summary" class="wish-summary"></div>
+      <div id="wish-list" class="wish-list"></div>
+      <p class="fine wish-fine">Sale timing and typical discounts are rules of thumb from public sale calendars, not promises. Each time you check an item, ShopWiz records its price, and after a few checks the verdict leans on that real history.</p>
     </section>
 
     <section id="tab-guide" hidden>

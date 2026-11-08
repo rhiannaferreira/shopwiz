@@ -13,9 +13,9 @@ let state = load();
 function load() {
   try {
     const s = JSON.parse(localStorage.getItem(STORE_KEY) || localStorage.getItem("bestswipe.v1"));
-    if (s && Array.isArray(s.cards)) return { rotating: [], portal: false, bonus: null, members: [], ...s };
+    if (s && Array.isArray(s.cards)) return { rotating: [], portal: false, bonus: null, members: [], wishlist: [], budget: null, ...s };
   } catch {}
-  return { cards: [], rotating: [], portal: false, bonus: null, members: [] };
+  return { cards: [], rotating: [], portal: false, bonus: null, members: [], wishlist: [], budget: null };
 }
 function save() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch {}
@@ -110,6 +110,7 @@ function openWallet() {
 function walletChanged() {
   save();
   renderWallet();
+  renderWishCount();
   renderTicker();
   if (current) openDeal(current);
   if (!$("#tab-guide").hidden) renderGuide();
@@ -364,6 +365,7 @@ function renderDeal(product, d) {
         <div class="barcode"></div>
       </article>
       <a class="go" href="${esc(safeUrl(b.link))}" target="_blank" rel="noopener">Go to ${esc(b.merchant)} ↗</a>
+      <button class="pill save-wish" id="save-wish" type="button" aria-pressed="${isSaved(product)}">${isSaved(product) ? "♥ On your wishlist" : "♡ Save to wishlist"}</button>
     </div>`;
 
   const stats = `
@@ -426,7 +428,10 @@ function renderDeal(product, d) {
       <p class="fine">From ${d.sample ? "sample" : "recent Amazon"} reviews, leaving out the ones that look fake.</p>
     </div>` : "";
 
-  $("#deal").onclick = (e) => copyCode(e.target.closest("[data-code]"));
+  $("#deal").onclick = (e) => {
+    copyCode(e.target.closest("[data-code]"));
+    if (e.target.closest("#save-wish")) toggleWish(product, b.net_price);
+  };
   $("#deal").innerHTML = `${left}<div class="side">${stats}${tip}${bonus}${trust}${owners}${race}</div>`;
 
   // Choreography: swipe, approve, count down to the real price, fill the bars and gauge.
@@ -467,6 +472,228 @@ async function renderGuide() {
   }
 }
 
+
+/* Wishlist: judge each saved item as buy now, wait or skip */
+const wishId = (p) => String(p.catalog_id || p.product_id || p.title || "").slice(0, 60);
+const isSaved = (p) => state.wishlist.some((w) => w.id === wishId(p));
+const today = () => new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD in the shopper's own time zone
+const fmtDay = (iso) => new Date(iso + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
+const busy = new Set();
+let wishPlan = null;
+const MAX_WISH = 12;
+
+function toggleWish(p, netPrice) {
+  const id = wishId(p);
+  if (isSaved(p)) {
+    state.wishlist = state.wishlist.filter((w) => w.id !== id);
+  } else if (state.wishlist.length >= MAX_WISH) {
+    alert(`Your wishlist holds ${MAX_WISH} items. Remove one to add another.`);
+    return;
+  } else {
+    state.wishlist.push({
+      id, title: p.title || "", catalog_id: p.catalog_id || "", product_id: p.product_id || "", image: p.image || "",
+      link: p.link || "", merchant: p.merchant || "", rating: p.rating || null, reviews: p.reviews || null,
+      list_price: p.original_price_value || null, added: today(), added_price: netPrice,
+      history: [{ d: today(), p: netPrice }], need_by: null, last: null, lastAt: null,
+    });
+  }
+  save();
+  const b = $("#save-wish");
+  if (b) { b.setAttribute("aria-pressed", isSaved(p)); b.textContent = isSaved(p) ? "♥ On your wishlist" : "♡ Save to wishlist"; }
+  renderWishCount();
+}
+
+function renderWishCount() {
+  const n = state.wishlist.length, el = $("#wish-count");
+  el.hidden = !n;
+  el.textContent = n;
+}
+
+function spark(h) {
+  if (h.length < 2) return "";
+  const ps = h.map((x) => x.p), lo = Math.min(...ps), hi = Math.max(...ps), span = hi - lo || 1;
+  const pts = h.map((x, i) => [(i / (h.length - 1)) * 116 + 2, 28 - ((x.p - lo) / span) * 24]);
+  const [lx, ly] = pts[pts.length - 1];
+  return `<svg class="trend" viewBox="0 0 120 32" role="img" aria-label="Price history from ${money(hi)} to ${money(ps[ps.length - 1])}">
+    <polyline points="${pts.map((p) => p.join(",")).join(" ")}" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="${lx}" cy="${ly}" r="3" fill="currentColor"/></svg>`;
+}
+
+const VERDICT = { buy_now: "Buy now", wait: "Wait", skip: "Skip" };
+function ago(ms) {
+  const m = Math.round((Date.now() - ms) / 60000);
+  return m < 2 ? "just now" : m < 90 ? `${m} min ago` : m < 2880 ? `${Math.round(m / 60)} hours ago` : `${Math.round(m / 1440)} days ago`;
+}
+
+function wishCard(it, i) {
+  const r = it.last, t = r?.timing, working = busy.has(it.id);
+  const stamp = working ? `<span class="stamp idle">Checking…</span>`
+    : t ? `<span class="stamp ${t.verdict}">${VERDICT[t.verdict]}</span>` : `<span class="stamp idle">Not checked</span>`;
+  const drop = r && it.added_price ? r.best.net_price - it.added_price : 0;
+  const price = r ? `<span class="wprice">${money(r.best.net_price)}</span>
+      <span class="wstore">${esc(r.best.merchant)}${r.best.card ? ` · pay with ${esc(r.best.card)}` : ""}</span>`
+    : `<span class="wstore">Saved at ${money(it.added_price)}</span>`;
+  const moved = r && Math.abs(drop) >= 1 ? `<span class="tag ${drop < 0 ? "win" : "warn"}">${drop < 0 ? "−" : "+"}${money(Math.abs(drop))} since saved</span>` : "";
+  return `<article class="wish ${t ? t.verdict : ""}" data-id="${esc(it.id)}" style="--i:${i}">
+    ${it.image ? `<img class="thumb" src="${esc(safeUrl(it.image))}" alt="" loading="lazy">` : `<span class="thumb">${esc((it.title || "?")[0])}</span>`}
+    <div class="wbody">
+      <div class="whead">${stamp}<h3 class="wtitle">${esc(it.title)}</h3></div>
+      <div class="wline">${price}${moved}</div>
+      ${t ? `<p class="wheadline">${esc(t.headline)}</p>
+        <ul class="wreasons">${t.reasons.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : `<p class="fine">Press “Check the market” to get a verdict.</p>`}
+      <div class="wfoot">
+        ${t ? `<span class="tag">${esc(t.confidence)} confidence</span>` : ""}
+        ${it.lastAt ? `<span class="fine">Checked ${ago(it.lastAt)}</span>` : ""}
+        <label class="needby">Need it by <input type="date" data-act="needby" value="${esc(it.need_by || "")}" min="${today()}"></label>
+      </div>
+    </div>
+    <div class="wside">
+      ${spark(it.history)}
+      ${it.history.length > 1 ? `<span class="fine">${it.history.length} checks</span>` : `<span class="fine">History starts now</span>`}
+      <button class="pill" data-act="deal" type="button">Full deal</button>
+      <button class="pill" data-act="check" type="button">Check</button>
+      <button class="pill quiet" data-act="remove" type="button" aria-label="Remove ${esc(it.title)} from wishlist">Remove</button>
+    </div>
+  </article>`;
+}
+
+function renderWish() {
+  renderWishCount();
+  const list = $("#wish-list"), items = state.wishlist;
+  $("#wish-budget").value = state.budget || "";
+  if (!items.length) {
+    list.innerHTML = `<div class="panel"><h3>Nothing saved yet</h3><p class="sub">Search for something, open its deal, and press “♡ Save to wishlist”. ShopWiz will keep an eye on it for you.</p><button class="pill" id="wish-go" type="button">Find something</button></div>`;
+    $("#wish-go").onclick = () => $$(".tabs button")[0].click();
+    $("#wish-summary").innerHTML = "";
+    return;
+  }
+  const order = wishPlan ? wishPlan.order : [];
+  const sorted = [...items].sort((a, b) => {
+    const ia = order.indexOf(a.id), ib = order.indexOf(b.id);
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+  });
+  list.innerHTML = sorted.map(wishCard).join("");
+  renderSummary();
+}
+
+function renderSummary() {
+  const el = $("#wish-summary"), p = wishPlan;
+  if (!p || !state.wishlist.some((w) => w.last)) { el.innerHTML = ""; return; }
+  const byId = (id) => state.wishlist.find((w) => w.id === id);
+  const cart = p.cart.map(byId).filter(Boolean);
+  el.innerHTML = `
+    <div class="stats">
+      <div class="stat hot"><b>${p.buy_now.length}</b><span>worth buying today${p.cart_saves ? ` · saves ${money(p.cart_saves)} vs list` : ""}</span></div>
+      <div class="stat"><b>${p.wait.length}</b><span>worth waiting for${p.wait_savings ? ` · could save ${money(p.wait_savings)} more` : ""}</span></div>
+      <div class="stat"><b>${p.skip.length}</b><span>to skip</span></div>
+    </div>
+    ${cart.length ? `<div class="panel cart"><h3>Buy these today${state.budget ? ` (budget ${money(state.budget)})` : ""}</h3>
+      <ul>${cart.map((w) => `<li><span>${esc(w.title)}</span><b>${money(w.last.best.net_price)}</b></li>`).join("")}</ul>
+      <div class="row total"><span>Total</span><b>${money(p.cart_total)}</b></div>
+      ${p.left_over != null ? `<p class="fine">${money(p.left_over)} left of your budget.</p>` : ""}</div>` : ""}`;
+}
+
+async function refreshPlan() {
+  const done = state.wishlist.filter((w) => w.last);
+  if (!done.length) { wishPlan = null; return; }
+  try {
+    wishPlan = await api("/api/wishlist/plan", {
+      budget: state.budget || null,
+      items: done.map((w) => ({
+        id: w.id, verdict: w.last.timing.verdict, score: w.last.timing.score, net_price: w.last.best.net_price,
+        saves: w.last.saves || 0, target_price: w.last.timing.target_price, wait_until: w.last.timing.wait_until,
+      })),
+    });
+  } catch {}
+}
+
+async function checkItem(it) {
+  busy.add(it.id);
+  renderWish();
+  try {
+    const r = await api("/api/wishlist/check", {
+      catalog_id: it.catalog_id, product_id: it.product_id, title: it.title, rating: it.rating, reviews: it.reviews,
+      cards: state.cards, rotating: state.rotating, use_portal: state.portal, members: state.members,
+      coupons: inbox.coupons.filter((c) => c.store_key), list_price: it.list_price, history: it.history, need_by: it.need_by,
+    });
+    it.history = it.history.filter((h) => h.d !== today()).concat({ d: today(), p: r.best.net_price }).slice(-30);
+    it.last = r;
+    it.lastAt = Date.now();
+    save();
+    return null;
+  } catch (err) {
+    return err.message;
+  } finally {
+    busy.delete(it.id);
+  }
+}
+
+let checking = false;
+async function checkAll(only) {
+  if (checking) return;
+  if (!state.cards.length) { $("#wish-note").textContent = "Add your cards first so prices count your rewards."; openWallet(); return; }
+  checking = true;
+  $("#wish-check").disabled = true;
+  $("#wish-note").textContent = "Checking stores…";
+  const queue = [...(only ? [only] : state.wishlist)], errors = [];
+  const worker = async () => {
+    while (queue.length) {
+      const msg = await checkItem(queue.shift());
+      if (msg) errors.push(msg);
+      renderWish();
+    }
+  };
+  await Promise.all([worker(), worker()]); // two at a time keeps the bill and the wait down
+  await refreshPlan();
+  checking = false;
+  $("#wish-check").disabled = false;
+  $("#wish-note").textContent = errors.length ? errors[0] : "Done.";
+  renderWish();
+}
+
+async function renderMarket() {
+  try {
+    const m = await api("/api/market");
+    $("#market").innerHTML = m.events.map((e, i) => `
+      <div class="mchip${i === 0 ? " next" : ""}"><b>${e.days}</b><span>${e.days === 1 ? "day" : "days"} to<br>${esc(e.name)}${e.approx ? " (about)" : ""}<br><small>${fmtDay(e.date)}</small></span></div>`).join("");
+  } catch {
+    $("#market").innerHTML = "";
+  }
+}
+
+$("#wish-check").onclick = () => checkAll();
+$("#wish-budget").onchange = async (e) => {
+  state.budget = Math.max(0, Number(e.target.value) || 0) || null;
+  save();
+  await refreshPlan();
+  renderWish();
+};
+$("#wish-list").addEventListener("click", (e) => {
+  const act = e.target.closest("[data-act]")?.dataset.act, card = e.target.closest(".wish");
+  if (!act || !card) return;
+  const it = state.wishlist.find((w) => w.id === card.dataset.id);
+  if (!it) return;
+  if (act === "remove") {
+    state.wishlist = state.wishlist.filter((w) => w !== it);
+    save();
+    refreshPlan().then(renderWish);
+    renderWish();
+  } else if (act === "check") {
+    checkAll(it);
+  } else if (act === "deal") {
+    $$(".tabs button")[0].click();
+    openDeal(it);
+  }
+});
+$("#wish-list").addEventListener("change", (e) => {
+  if (e.target.dataset.act !== "needby") return;
+  const it = state.wishlist.find((w) => w.id === e.target.closest(".wish").dataset.id);
+  if (!it) return;
+  it.need_by = e.target.value || null;
+  save();
+  checkAll(it); // the offers are cached for an hour, so this is usually free
+});
+
 /* Looks */
 function markSkin() {
   $$(".skins button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.skin === document.documentElement.dataset.skin));
@@ -483,8 +710,10 @@ $$(".tabs button").forEach((btn) => {
   btn.onclick = () => {
     $$(".tabs button").forEach((b) => b.setAttribute("aria-selected", b === btn));
     $("#tab-shop").hidden = btn.dataset.tab !== "shop";
+    $("#tab-wish").hidden = btn.dataset.tab !== "wish";
     $("#tab-guide").hidden = btn.dataset.tab !== "guide";
     if (btn.dataset.tab === "guide") renderGuide();
+    if (btn.dataset.tab === "wish") { renderMarket(); refreshPlan().then(renderWish); renderWish(); }
   };
 });
 

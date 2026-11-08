@@ -15,9 +15,11 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from datetime import date
+
 from pydantic import BaseModel, Field
 
-from shopwiz import apify, gmail
+from shopwiz import apify, gmail, timing
 from shopwiz.coupons import best_by_store, extract
 from shopwiz.cards import Catalog
 from shopwiz.extras import bonus_note, price_match_tip, review_verdict, understand
@@ -43,7 +45,7 @@ def live() -> bool:
 # one visitor and the whole site can make. Cached results are free and don't count.
 # These counters live in memory, so they reset when the server restarts. Also set a
 # monthly usage limit in your Apify account settings as the hard cap.
-PER_VISITOR_HOUR = int(os.environ.get("SHOPWIZ_VISITOR_LIMIT", "15"))
+PER_VISITOR_HOUR = int(os.environ.get("SHOPWIZ_VISITOR_LIMIT", "30"))
 SITE_PER_DAY = int(os.environ.get("SHOPWIZ_DAILY_LIMIT", "300"))
 _spend: dict[str, list[float]] = {}
 
@@ -178,6 +180,18 @@ def _filter(products: list[dict], intent: dict) -> list[dict]:
     return out
 
 
+def _live_offers(req, request: Request) -> list[dict]:
+    if not (req.catalog_id or req.product_id):
+        raise HTTPException(400, "Pick a product first.")
+    try:
+        return cached(("offers", req.catalog_id, req.product_id),
+                      lambda: apify.product_offers(req.catalog_id, req.product_id), visitor(request))
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(502, "Couldn't get store prices right now. Try again in a moment.")
+
+
 @app.post("/api/deal")
 def deal(req: DealRequest, request: Request):
     wallet = wallet_or_400(req.cards)
@@ -187,15 +201,7 @@ def deal(req: DealRequest, request: Request):
         more = sample("offers_more")
         offers, reviews = (more[req.catalog_id], None) if req.catalog_id in more else (sample("offers"), sample("reviews"))
     else:
-        if not (req.catalog_id or req.product_id):
-            raise HTTPException(400, "Pick a product first.")
-        try:
-            offers = cached(("offers", req.catalog_id, req.product_id),
-                            lambda: apify.product_offers(req.catalog_id, req.product_id), visitor(request))
-        except HTTPException:
-            raise
-        except Exception:
-            raise HTTPException(502, "Couldn't get store prices right now. Try again in a moment.")
+        offers = _live_offers(req, request)
         review_url = req.review_url or next((o["link"] for o in offers if "amazon." in str(o.get("link"))), None)
         if review_url and "amazon." in review_url:
             try:
@@ -230,6 +236,82 @@ def deal(req: DealRequest, request: Request):
         "bonus": bonus_note(best, req.bonus, wallet, catalog),
         "portal": {"name": catalog.portal, "as_of": catalog.portal_as_of, "on": req.use_portal},
     }
+
+
+class HistoryPoint(BaseModel):
+    d: str = Field(max_length=10)  # the day the price was seen, YYYY-MM-DD
+    p: float = Field(ge=0, le=100000)
+
+
+class WishCheck(DealRequest):
+    list_price: float | None = Field(default=None, ge=0, le=100000)  # the listing's "was" price, if it had one
+    history: list[HistoryPoint] = Field(default_factory=list, max_length=60)
+    need_by: str | None = Field(default=None, max_length=10)
+
+
+class WishItem(BaseModel):
+    id: str = Field(max_length=60)
+    verdict: str = Field(pattern="^(buy_now|wait|skip)$")
+    score: float = Field(ge=0, le=100)
+    net_price: float = Field(ge=0)
+    saves: float | None = None
+    target_price: float | None = None
+    wait_until: str | None = Field(default=None, max_length=10)
+
+
+class WishPlan(BaseModel):
+    items: list[WishItem] = Field(max_length=40)
+    budget: float | None = Field(default=None, ge=0, le=1000000)
+
+
+@app.get("/api/market")
+def market():
+    """The sale calendar: what's coming up and how many days away it is."""
+    today = date.today()
+    return {"today": today.isoformat(), "events": timing.upcoming(today, 4)}
+
+
+@app.post("/api/wishlist/check")
+def wishlist_check(req: WishCheck, request: Request):
+    """Prices one wishlist item across stores and says whether to buy now or wait. No review scraping, so it stays cheap."""
+    wallet = wallet_or_400(req.cards)
+    for value in (req.need_by, *[h.d for h in req.history]):
+        if value:
+            try:
+                date.fromisoformat(value)
+            except ValueError:
+                raise HTTPException(400, "Dates need the form YYYY-MM-DD.")
+    if not live():
+        more = sample("offers_more")
+        offers = more[req.catalog_id] if req.catalog_id in more else sample("offers")
+    else:
+        offers = _live_offers(req, request)
+    prices = {catalog.store(o["merchant"]).key: parse_price(o.get("price_value", o.get("price"))) or 0
+              for o in offers if o.get("merchant")}
+    coupons = best_by_store([c.model_dump() for c in req.coupons], prices)
+    title = req.title or (offers[0].get("product_title", "") if offers else "")
+    ranked = rank_offers(offers, wallet, catalog, set(req.rotating), req.use_portal, set(req.members),
+                         is_electronics(title), coupons)
+    buyable = [r for r in ranked if r.condition == "new" and not r.needs_membership]
+    if not buyable:
+        raise HTTPException(404, "No new-condition store prices found for this product.")
+    best = buyable[0]
+    listing = [{"rating": req.rating, "reviews": req.reviews}] if req.rating and req.reviews else []
+    rating = trust_rating(offers + listing if not any(o.get("rating") for o in offers) else offers, None)
+    t = timing.evaluate(title, best.net_price, [r.net_price for r in buyable], req.list_price, rating.rating,
+                        rating.total_reviews, [h.model_dump() for h in req.history], req.need_by, date.today())
+    return {
+        "sample": not live(), "checked": date.today().isoformat(),
+        "best": _offer_json(best), "stores": len(buyable),
+        "saves": round(req.list_price - best.net_price, 2) if req.list_price and req.list_price > best.net_price else 0,
+        "timing": {**t.__dict__, "extras": None},
+    }
+
+
+@app.post("/api/wishlist/plan")
+def wishlist_plan(req: WishPlan):
+    """Orders the checked wishlist and, with a budget, picks what to buy today. No store lookups, so it's free."""
+    return timing.plan([i.model_dump() for i in req.items], req.budget)
 
 
 @app.post("/api/wallet")

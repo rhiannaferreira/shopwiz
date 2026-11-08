@@ -10,6 +10,7 @@ Find the lowest real price for something you want to buy. ShopWiz checks the sto
 - **Which card to swipe.** Uses each card's categories and caps, store categories (Amazon, Walmart.com, Target, warehouse clubs and others), the card networks a store accepts (Costco doesn't take Amex), and rotating 5% categories you've activated.
 - **Price match tip.** Some stores match a competitor's lower price. If one of your cards earns more at that store, ShopWiz tells you to buy there and ask for the match.
 - **Sign-up bonus mode.** If you're working toward a card's welcome bonus, it shows what the purchase does to your progress and what you give up.
+- **Wishlist that says buy now or wait.** Save products, then check the market. Each item gets a verdict from today's best price after your cards and coupons, how far that is below the list price, how the stores compare, the price history ShopWiz has recorded for you, and the sale calendar (Black Friday, Cyber Monday and others). It also suggests a target price when waiting is likely to pay off, and with a budget it picks what to buy today. Sale timing and typical discounts are rules of thumb, and the verdict says how confident it is.
 - **Trust-adjusted rating.** Combines star ratings across stores, pulls products with few ratings toward average, and discounts reviews that look fake (unverified 5-star reviews, short generic text, copied text, bursts on one day).
 - **Hidden costs and returns.** Counts Costco's non-member surcharge, flags stores that need a membership, and shows each store's return window.
 - **What owners say.** Breaks reviews into topics (comfort, battery, durability and more) with the share of happy owners.
@@ -43,7 +44,7 @@ uvicorn app:app --reload
 | `ANTHROPIC_API_KEY`, `SHOPWIZ_AI_MODEL` | Optional: API key and a small model id, for harder search requests and review summaries |
 | `SHOPWIZ_SHOPPING_ACTOR` | Google Shopping actor (default `experthasan~google-shopping-scraper`) |
 | `SHOPWIZ_REVIEWS_ACTOR` | Amazon reviews actor (default `junglee~amazon-reviews-scraper`) |
-| `SHOPWIZ_VISITOR_LIMIT` | Live (uncached) lookups one visitor can make per hour (default 15) |
+| `SHOPWIZ_VISITOR_LIMIT` | Live (uncached) lookups one visitor can make per hour (default 30) |
 | `SHOPWIZ_DAILY_LIMIT` | Live lookups the whole site can make per day (default 300) |
 
 ### Gmail setup

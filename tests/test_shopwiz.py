@@ -243,3 +243,72 @@ def test_bundles_sort_below_the_plain_product():
              {"title": "Sony XM5 Headphones", "catalog_id": "c"}]
     assert _filter(items, {"query": "sony xm5"})[0]["catalog_id"] == "c"
     assert _filter(items, {"query": "sony xm5 bundle"})[0]["catalog_id"] == "a"
+
+
+def test_market_calendar_dates():
+    from datetime import date
+    from shopwiz.timing import black_friday, upcoming
+    assert black_friday(2026) == date(2026, 11, 27)
+    assert black_friday(2025) == date(2025, 11, 28)
+    soon = upcoming(date(2026, 11, 8), 2)
+    assert [e["key"] for e in soon] == ["black_friday", "cyber_monday"] and soon[0]["days"] == 19
+
+
+def _timing(title, net, list_price, today="2026-11-08", history=(), need_by=None, nets=None, rating=4.5, count=500):
+    from datetime import date
+    from shopwiz.timing import evaluate
+    return evaluate(title, net, nets or [net, net * 1.05, net * 1.1], list_price, rating, count, list(history), need_by, date.fromisoformat(today))
+
+
+def test_waits_for_black_friday_when_the_price_is_still_high():
+    t = _timing("Bose QuietComfort Headphones", 379.0, 429.0)
+    assert t.verdict == "wait" and t.event == "Black Friday" and t.target_price < 379
+    assert t.wait_until == "2026-11-27"
+
+
+def test_buys_when_already_at_a_black_friday_price():
+    assert _timing("Sony WH-1000XM5 Headphones", 299.99, 399.99).verdict == "buy_now"
+
+
+def test_need_by_before_the_sale_means_buy_now():
+    t = _timing("Bose QuietComfort Headphones", 379.0, 429.0, need_by="2026-11-15")
+    assert t.verdict == "buy_now" and any("need it by" in r for r in t.reasons)
+
+
+def test_no_sale_soon_means_buy_now():
+    assert _timing("Bose QuietComfort Headphones", 379.0, 429.0, today="2027-01-10").verdict == "buy_now"
+
+
+def test_weak_reviews_mean_skip():
+    assert _timing("Mystery Headphones", 50.0, 90.0, rating=3.2, count=400).verdict == "skip"
+
+
+def test_price_history_marks_a_new_low():
+    hist = [{"d": "2026-10-20", "p": 330}, {"d": "2026-10-27", "p": 320}, {"d": "2026-11-03", "p": 310}]
+    t = _timing("Blender", 299.0, None, today="2027-03-01", history=hist)
+    assert t.verdict == "buy_now" and any("Lowest price you've seen" in r for r in t.reasons) and t.confidence == "medium"
+
+
+def test_plan_picks_a_cart_within_budget():
+    from shopwiz.timing import plan
+    items = [{"id": "a", "verdict": "buy_now", "score": 80, "net_price": 200, "saves": 50},
+             {"id": "b", "verdict": "buy_now", "score": 70, "net_price": 150, "saves": 20},
+             {"id": "c", "verdict": "wait", "score": 40, "net_price": 300, "target_price": 250, "wait_until": "2026-11-27"},
+             {"id": "d", "verdict": "skip", "score": 10, "net_price": 90}]
+    p = plan(items, 300)
+    assert p["cart"] == ["a"] and p["left_over"] == 100 and p["order"] == ["a", "b", "c", "d"] and p["wait_savings"] == 50
+    assert plan(items)["cart"] == ["a", "b"]
+
+
+def test_wishlist_check_and_plan_endpoints():
+    body = {"catalog_id": "sample-bose-qcu", "title": "Bose QuietComfort Ultra Headphones", "cards": ["chase-freedom-unlimited"],
+            "list_price": 429.0, "rating": 4.5, "reviews": 6120, "history": [{"d": "2026-11-01", "p": 400}]}
+    r = client.post("/api/wishlist/check", json=body)
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["timing"]["verdict"] in {"buy_now", "wait", "skip"} and d["best"]["net_price"] > 0 and d["stores"] >= 1
+    assert client.post("/api/wishlist/check", json={**body, "need_by": "soon"}).status_code == 400
+    p = client.post("/api/wishlist/plan", json={"budget": 500, "items": [
+        {"id": "x", "verdict": "buy_now", "score": 60, "net_price": d["best"]["net_price"]}]})
+    assert p.status_code == 200 and p.json()["cart"] == ["x"]
+    assert client.get("/api/market").json()["events"]

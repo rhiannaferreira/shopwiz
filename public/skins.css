@@ -39,7 +39,7 @@
 [data-skin="paper"] .ccard::before { opacity: 0; }
 [data-skin="paper"] .section-title, [data-skin="paper"] .inbox-title { font-family: var(--display); font-weight: 400; text-transform: none; font-size: clamp(32px, 4.4vw, 54px); letter-spacing: -.02em; }
 [data-skin="paper"] .section-title .num { color: var(--lime); }
-[data-skin="paper"] .product, [data-skin="paper"] .panel, [data-skin="paper"] .stat, [data-skin="paper"] .gtile, [data-skin="paper"] .inbox, [data-skin="paper"] .coupon {
+[data-skin="paper"] .product, [data-skin="paper"] .panel, [data-skin="paper"] .stat, [data-skin="paper"] .gtile, [data-skin="paper"] .inbox, [data-skin="paper"] .coupon, [data-skin="paper"] .wish, [data-skin="paper"] .mchip {
   background: var(--bg-2); border: 2px solid var(--ink); border-radius: 0; box-shadow: 5px 5px 0 var(--ink); -webkit-mask: none; mask: none; }
 [data-skin="paper"] .product span.thumb { background: var(--ink); color: var(--bg); border-radius: 0; }
 [data-skin="paper"] .product[aria-pressed="true"] { box-shadow: 5px 5px 0 var(--lime); border-color: var(--ink); }
@@ -88,7 +88,7 @@
 [data-skin="arcade"] .ticker-track b { color: var(--lime); }
 [data-skin="arcade"] .section-title, [data-skin="arcade"] .inbox-title { font-family: var(--display); font-weight: 700; }
 [data-skin="arcade"] .section-title .num { background: var(--pink); color: #fff; padding: 4px 8px; border: 3px solid var(--ink); }
-[data-skin="arcade"] .product, [data-skin="arcade"] .panel, [data-skin="arcade"] .stat, [data-skin="arcade"] .gtile, [data-skin="arcade"] .inbox, [data-skin="arcade"] .coupon {
+[data-skin="arcade"] .product, [data-skin="arcade"] .panel, [data-skin="arcade"] .stat, [data-skin="arcade"] .gtile, [data-skin="arcade"] .inbox, [data-skin="arcade"] .coupon, [data-skin="arcade"] .wish, [data-skin="arcade"] .mchip {
   background: #fff; border: 3px solid var(--ink); box-shadow: 6px 6px 0 var(--ink); -webkit-mask: none; mask: none; }
 [data-skin="arcade"] .inbox { background: var(--blue); color: #fff; }
 [data-skin="arcade"] .inbox .fine, [data-skin="arcade"] .inbox .kicker { color: #fff; }
@@ -154,7 +154,7 @@
 [data-skin="aura"] .ticker-track span::before { content: "✿ "; color: var(--pink); }
 [data-skin="aura"] .section-title, [data-skin="aura"] .inbox-title { font-family: var(--display); font-weight: 500; text-transform: none; letter-spacing: -.02em; }
 [data-skin="aura"] .section-title .num { font-family: var(--display); font-style: italic; font-size: 20px; }
-[data-skin="aura"] .product, [data-skin="aura"] .panel, [data-skin="aura"] .stat, [data-skin="aura"] .gtile, [data-skin="aura"] .inbox, [data-skin="aura"] .coupon {
+[data-skin="aura"] .product, [data-skin="aura"] .panel, [data-skin="aura"] .stat, [data-skin="aura"] .gtile, [data-skin="aura"] .inbox, [data-skin="aura"] .coupon, [data-skin="aura"] .wish, [data-skin="aura"] .mchip {
   background: rgba(255,255,255,.6); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); border: 1px solid rgba(255,255,255,.9);
   box-shadow: 0 20px 50px -30px rgba(80,50,180,.35); }
 [data-skin="aura"] .coupon { -webkit-mask: none; mask: none; border: 1px dashed rgba(124,92,255,.4); }
@@ -214,7 +214,7 @@
 [data-skin="terminal"] .ticker-track span::before { content: "▲ "; color: var(--lime); }
 [data-skin="terminal"] .section-title, [data-skin="terminal"] .inbox-title { font: 700 18px var(--mono); letter-spacing: .06em; border-bottom: 1px solid var(--ink); padding-bottom: 6px; margin-top: 36px; }
 [data-skin="terminal"] .section-title .num { background: var(--ink); color: #000; padding: 0 6px; }
-[data-skin="terminal"] .product, [data-skin="terminal"] .panel, [data-skin="terminal"] .stat, [data-skin="terminal"] .gtile, [data-skin="terminal"] .inbox, [data-skin="terminal"] .coupon {
+[data-skin="terminal"] .product, [data-skin="terminal"] .panel, [data-skin="terminal"] .stat, [data-skin="terminal"] .gtile, [data-skin="terminal"] .inbox, [data-skin="terminal"] .coupon, [data-skin="terminal"] .wish, [data-skin="terminal"] .mchip {
   background: #000; border: 1px solid var(--line); border-radius: 0; box-shadow: none; -webkit-mask: none; mask: none; }
 [data-skin="terminal"] .panel h3 { font-family: var(--mono); font-size: 12px; letter-spacing: .14em; color: #000; background: var(--ink); margin: -22px -22px 14px; padding: 4px 22px; }
 [data-skin="terminal"] .product span.thumb { background: var(--surface-2); color: var(--ink); border-radius: 0; font-family: var(--mono); }
