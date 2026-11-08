@@ -487,7 +487,8 @@ function toggleWish(p, netPrice) {
   if (isSaved(p)) {
     state.wishlist = state.wishlist.filter((w) => w.id !== id);
   } else if (state.wishlist.length >= MAX_WISH) {
-    alert(`Your wishlist holds ${MAX_WISH} items. Remove one to add another.`);
+    const b = $("#save-wish");
+    if (b) b.textContent = `Wishlist is full (${MAX_WISH}). Remove one first.`;
     return;
   } else {
     state.wishlist.push({

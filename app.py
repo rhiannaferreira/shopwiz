@@ -10,29 +10,49 @@ import os
 import re
 import secrets
 import time
+from datetime import date
 from pathlib import Path
+from urllib.parse import urlparse
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from datetime import date
-
 from pydantic import BaseModel, Field
 
-from shopwiz import apify, gmail, timing
+from shopwiz import apify, extras, gmail, timing
 from shopwiz.coupons import best_by_store, extract
 from shopwiz.cards import Catalog
-from shopwiz.extras import bonus_note, price_match_tip, review_verdict, understand
+from shopwiz.extras import bonus_note, parse_query, price_match_tip, review_verdict, understand
 from shopwiz.optimize import is_electronics, parse_price, rank_offers, wallet_guide
 from shopwiz.ratings import aspects, suspicious, trust_rating
 
 ROOT = Path(__file__).parent
 PUBLIC = ROOT / "public"
 SAMPLES = ROOT / "tests" / "fixtures"
-CACHE_SECONDS = 3600
-BUNDLE = re.compile(r"\b(bundle|kit|combo|protection plan|with (?:power bank|stand|case)|\+)|\s\+\s", re.I)  # prices move, so cached results expire after an hour
+CACHE_SECONDS = 3600  # prices move, so cached results expire after an hour
+CACHE_MAX = 500  # a public site sees endless different searches, so the cache can't grow without limit
+BUNDLE = re.compile(r"\b(bundle|kit|combo|protection plan|with (?:power bank|stand|case)|\+)|\s\+\s", re.I)
 
 app = FastAPI(title="ShopWiz")
+
+# The same headers are set in vercel.json for the static files, which Vercel serves without this app.
+SECURITY_HEADERS = {
+    "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+                               "font-src https://fonts.gstatic.com; img-src 'self' https: data:; connect-src 'self'; "
+                               "frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "X-Frame-Options": "DENY",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+}
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    for k, v in SECURITY_HEADERS.items():
+        response.headers.setdefault(k, v)
+    return response
 catalog = Catalog()
 _cache: dict[tuple, tuple[float, object]] = {}
 
@@ -66,6 +86,9 @@ def spend(who: str) -> None:
     if len(mine) >= PER_VISITOR_HOUR:
         raise HTTPException(429, "You've done a lot of live checks this hour. Try again in a bit.")
     _spend[who], _spend["*"] = mine + [now], site + [now]
+    if len(_spend) > 5000:  # forget visitors who haven't made a live call in the last hour
+        for k in [k for k, v in _spend.items() if k != "*" and not any(now - x < 3600 for x in v)]:
+            del _spend[k]
 
 
 def cached(key: tuple, fetch, who: str | None = None):
@@ -75,6 +98,9 @@ def cached(key: tuple, fetch, who: str | None = None):
     if who is not None:
         spend(who)
     value = fetch()
+    if len(_cache) >= CACHE_MAX:
+        for k, _ in sorted(_cache.items(), key=lambda kv: kv[1][0])[: CACHE_MAX // 5]:
+            del _cache[k]  # drop the oldest fifth
     _cache[key] = (time.time(), value)
     return value
 
@@ -144,7 +170,10 @@ def search(q: str, request: Request):
     q = q.strip()
     if not q or len(q) > 300:
         raise HTTPException(400, "Type what you're shopping for.")
-    intent = cached(("intent", q.lower()), lambda: understand(q))
+    try:  # the optional AI step costs money too, so it counts toward the same limits
+        intent = cached(("intent", q.lower()), lambda: understand(q), visitor(request) if extras.ai_enabled() else None)
+    except HTTPException:
+        intent = parse_query(q)  # over the limit: fall back to the free rules instead of failing the search
     if not live():
         products = sample("search")
     else:
@@ -173,11 +202,24 @@ def _filter(products: list[dict], intent: dict) -> list[dict]:
             continue
         seen.add(key)
         out.append(p)
+    # Listings without a Google catalog id can't be compared across stores, so keep them only if nothing else is left.
+    priced = [p for p in out if p.get("catalog_id")]
+    out = priced or out
     # Bundles and kits ("+ earbuds", "with stand", "protection plan") go below the plain product,
     # unless the shopper asked for a bundle.
     if not BUNDLE.search(intent.get("query", "")):
         out.sort(key=lambda p: bool(BUNDLE.search(p.get("title", ""))))
     return out
+
+
+def amazon_url(url) -> bool:
+    """Only real Amazon product pages go to the reviews scraper, so a visitor can't point it at other sites."""
+    try:
+        u = urlparse(str(url or ""))
+    except ValueError:
+        return False
+    host = (u.hostname or "").lower()
+    return u.scheme == "https" and (host == "amazon.com" or host.endswith(".amazon.com"))
 
 
 def _live_offers(req, request: Request) -> list[dict]:
@@ -202,8 +244,8 @@ def deal(req: DealRequest, request: Request):
         offers, reviews = (more[req.catalog_id], None) if req.catalog_id in more else (sample("offers"), sample("reviews"))
     else:
         offers = _live_offers(req, request)
-        review_url = req.review_url or next((o["link"] for o in offers if "amazon." in str(o.get("link"))), None)
-        if review_url and "amazon." in review_url:
+        review_url = next((u for u in [req.review_url, *[o.get("link") for o in offers]] if amazon_url(u)), None)
+        if review_url:
             try:
                 reviews = cached(("reviews", review_url), lambda: apify.amazon_reviews(review_url), visitor(request))
             except Exception:
@@ -320,7 +362,7 @@ def wallet(req: WalletRequest):
 
 
 # Gmail: sign in, read promotions, sign out. The token stays in an http-only cookie and nothing is stored here.
-TOKEN_COOKIE, STATE_COOKIE = "bs_gmail", "bs_state"
+TOKEN_COOKIE, STATE_COOKIE = "shopwiz_gmail", "shopwiz_state"
 
 
 def _redirect_uri(request: Request) -> str:
@@ -339,7 +381,7 @@ def google_login(request: Request):
 
 @app.get("/auth/google/callback", name="google_callback")
 def google_callback(request: Request, code: str = "", state: str = "", error: str = ""):
-    if error or not code or not state or state != request.cookies.get(STATE_COOKIE):
+    if error or not code or not state or not secrets.compare_digest(state, request.cookies.get(STATE_COOKIE, "")):
         return RedirectResponse("/#inbox-error")
     try:
         token = gmail.exchange(code, _redirect_uri(request))

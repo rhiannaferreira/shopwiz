@@ -161,7 +161,7 @@ def evaluate(title: str, net: float, nets: list[float], list_price: float | None
         extra_drop = max(0.0, (net - expected) / net)
         if hist and hist["at_low"]:
             extra_drop *= 0.5  # a price this low is hard to beat
-        need_before = need_by and date.fromisoformat(need_by) < date.fromisoformat(event["date"])
+        need_before = need_by and today <= date.fromisoformat(need_by) < date.fromisoformat(event["date"])
         if need_before:
             reasons.append(f"You need it by {date.fromisoformat(need_by):%b} {date.fromisoformat(need_by).day}, before {event['name']}.")
         elif extra_drop >= WAIT_IF_EXTRA_DROP:

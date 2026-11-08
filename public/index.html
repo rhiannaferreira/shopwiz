@@ -12,13 +12,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;800;900&family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;800&family=Instrument+Serif:ital@0;1&family=Silkscreen:wght@400;700&family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400..600&family=IBM+Plex+Mono:wght@400;600;700&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="skins.css">
-  <script>
-    (function () {
-      var skins = ["aura", "neon", "paper", "arcade", "terminal"], s = new URLSearchParams(location.search).get("skin");
-      try { s = s || localStorage.getItem("shopwiz.skin"); } catch (e) {}
-      document.documentElement.dataset.skin = skins.indexOf(s) >= 0 ? s : "aura";
-    })();
-  </script>
+  <script src="skin.js"></script>
 </head>
 <body>
   <div class="grain" aria-hidden="true"></div>
@@ -35,9 +29,9 @@
       <button data-skin="terminal" title="Terminal" aria-label="Terminal look"></button>
     </div>
     <nav class="tabs" role="tablist">
-      <button role="tab" aria-selected="true" data-tab="shop">Shop</button>
-      <button role="tab" aria-selected="false" data-tab="wish">Wishlist <span class="count" id="wish-count" hidden></span></button>
-      <button role="tab" aria-selected="false" data-tab="guide">Card cheat sheet</button>
+      <button role="tab" id="t-shop" aria-controls="tab-shop" aria-selected="true" data-tab="shop">Shop</button>
+      <button role="tab" id="t-wish" aria-controls="tab-wish" aria-selected="false" data-tab="wish">Wishlist <span class="count" id="wish-count" hidden></span></button>
+      <button role="tab" id="t-guide" aria-controls="tab-guide" aria-selected="false" data-tab="guide">Card cheat sheet</button>
     </nav>
     </div>
   </header>
@@ -45,7 +39,7 @@
   <div id="sample-banner" class="banner" hidden><span class="dot"></span>Sample mode: made-up prices and reviews so you can try it. Add an Apify token for live stores.</div>
 
   <main>
-    <section id="tab-shop">
+    <section id="tab-shop" role="tabpanel" aria-labelledby="t-shop">
       <div class="hero">
         <div class="hero-copy">
           <p class="kicker">Your cards × every store × real reviews</p>
@@ -95,7 +89,7 @@
       </section>
     </section>
 
-    <section id="tab-wish" hidden>
+    <section id="tab-wish" role="tabpanel" aria-labelledby="t-wish" hidden>
       <div class="hero solo">
         <div class="hero-copy">
           <p class="kicker">Buy now or wait</p>
@@ -116,7 +110,7 @@
       <p class="fine wish-fine">Sale timing and typical discounts are rules of thumb from public sale calendars, not promises. Each time you check an item, ShopWiz records its price, and after a few checks the verdict leans on that real history.</p>
     </section>
 
-    <section id="tab-guide" hidden>
+    <section id="tab-guide" role="tabpanel" aria-labelledby="t-guide" hidden>
       <div class="hero solo">
         <div class="hero-copy">
           <p class="kicker">Your wallet, decoded</p>

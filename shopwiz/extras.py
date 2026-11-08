@@ -87,6 +87,10 @@ AI_PROMPT = """You turn a shopper's request into a product search. Reply with JS
 Request: """
 
 
+def ai_enabled() -> bool:
+    return bool(os.environ.get("ANTHROPIC_API_KEY") and AI_MODEL)
+
+
 def _ask_ai(prompt: str, max_tokens: int) -> dict | None:
     """One short call to a small model, returning its JSON reply, or None if there's no key or anything fails."""
     key = os.environ.get("ANTHROPIC_API_KEY")

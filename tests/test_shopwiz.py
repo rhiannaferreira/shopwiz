@@ -312,3 +312,36 @@ def test_wishlist_check_and_plan_endpoints():
         {"id": "x", "verdict": "buy_now", "score": 60, "net_price": d["best"]["net_price"]}]})
     assert p.status_code == 200 and p.json()["cart"] == ["x"]
     assert client.get("/api/market").json()["events"]
+
+
+def test_only_amazon_pages_reach_the_reviews_scraper():
+    from app import amazon_url
+    assert amazon_url("https://www.amazon.com/dp/B09XS7JWHH") and amazon_url("https://amazon.com/dp/x")
+    assert not amazon_url("https://evil.com/?amazon.com") and not amazon_url("https://amazon.com.evil.com/x")
+    assert not amazon_url("http://www.amazon.com/dp/x") and not amazon_url(None) and not amazon_url("javascript:amazon.com")
+
+
+def test_cache_and_spend_tables_stay_bounded(monkeypatch):
+    import app as shop
+    monkeypatch.setattr(shop, "CACHE_MAX", 10)
+    monkeypatch.setattr(shop, "_cache", {})
+    for i in range(40):
+        shop.cached(("k", i), lambda: 1)
+    assert len(shop._cache) <= 10
+
+
+def test_listings_without_a_catalog_id_are_dropped_when_others_exist():
+    from app import _filter
+    items = [{"title": "A", "product_id": "1", "catalog_id": None}, {"title": "B", "product_id": "2", "catalog_id": "x"}]
+    assert [p["title"] for p in _filter(items, {"query": "a"})] == ["B"]
+    assert len(_filter(items[:1], {"query": "a"})) == 1
+
+
+def test_security_headers_are_sent():
+    r = client.get("/api/config")
+    assert "script-src 'self'" in r.headers["content-security-policy"] and r.headers["x-content-type-options"] == "nosniff"
+
+
+def test_a_past_need_by_date_is_ignored():
+    t = _timing("Bose QuietComfort Headphones", 379.0, 429.0, need_by="2026-11-01")
+    assert t.verdict == "wait"
