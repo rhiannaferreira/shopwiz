@@ -345,3 +345,56 @@ def test_security_headers_are_sent():
 def test_a_past_need_by_date_is_ignored():
     t = _timing("Bose QuietComfort Headphones", 379.0, 429.0, need_by="2026-11-01")
     assert t.verdict == "wait"
+
+
+def _card(card_id):
+    return next(c for c in json.loads((Path(__file__).parent.parent / "data" / "cards.json").read_text())["cards"] if c["id"] == card_id)
+
+
+def _page(name):
+    return (Path(__file__).parent / "fixtures" / "card_pages" / f"{name}.txt").read_text()
+
+
+def test_card_check_confirms_rates_the_page_backs_up():
+    from shopwiz.refresh import check_card
+    r = check_card(_card("amex-gold"), _page("amex-gold"))
+    assert r.status == "ok", [c for c in r.checks if c.status != "confirmed"]
+    assert {c.category for c in r.checks} >= {"dining", "supermarket", "flights", "base"}
+
+
+def test_card_check_flags_a_rate_that_changed_and_one_that_is_missing():
+    from shopwiz.refresh import check_card
+    card = {**_card("chase-freedom-flex"), "earn": [{"rate": 4, "categories": ["dining"]}, {"rate": 3, "categories": ["entertainment"]}]}
+    r = check_card(card, _page("chase-freedom-flex"))
+    by = {c.category: c for c in r.checks}
+    assert r.status == "review"
+    assert by["dining"].status == "different" and "3" in by["dining"].detail
+    assert by["entertainment"].status == "missing"
+
+
+def test_card_check_reports_blocked_pages_instead_of_guessing():
+    from shopwiz.refresh import check_card
+    assert check_card(_card("citi-double-cash"), _page("citi-double-cash")).status == "blocked"
+
+
+def test_rate_parser_ignores_bonus_points_and_dollar_amounts():
+    from shopwiz.refresh import mentions
+    found = [r for r, _ in mentions("earn 100,000 bonus points after $4,000. then 3x points, 2.5% back*, 1 % cash back")]
+    assert found == [3.0, 2.5, 1.0]
+
+
+def test_crawl_matches_pages_back_to_the_urls_asked_for():
+    from shopwiz.refresh import crawl
+    fake = lambda actor, payload, timeout=0: [{"url": "https://www.apple.com/apple-card/#faq", "text": "hello"}]
+    assert crawl(["https://www.apple.com/apple-card/"], fake)["https://www.apple.com/apple-card/"].strip() == "hello"
+
+
+def test_every_card_has_a_source_page_and_the_report_renders(tmp_path):
+    from shopwiz import refresh
+    cards = json.loads((Path(__file__).parent.parent / "data" / "cards.json").read_text())["cards"]
+    sources = refresh.load_sources()
+    assert all(sources.get(c["id"]) for c in cards)
+    out = tmp_path / "r.md"
+    refresh.main(["--only", "amex-gold", "citi-double-cash", "--from-dir", str(Path(__file__).parent / "fixtures" / "card_pages"), "--out", str(out)])
+    text = out.read_text()
+    assert "Amex Gold: OK" in text and "Citi Double Cash: BLOCKED" in text

@@ -72,6 +72,19 @@ A public site spends your Apify credit, so ShopWiz limits uncached lookups per v
 python -m pytest -q
 ```
 
+## Checking card rewards against the issuers
+
+Card rules live in `data/cards.json` and go stale. `python -m shopwiz.refresh` scrapes each card's official page with Apify (the website content crawler) and writes `reports/card-check.md`. For every rate ShopWiz stores, the report says whether the page backs it up, shows a different number, or never mentions it. It also lists other rates it saw, which can point to new tiers.
+
+```bash
+export APIFY_TOKEN=...
+python -m shopwiz.refresh                      # every card
+python -m shopwiz.refresh --only amex-gold     # one card
+python -m shopwiz.refresh --from-dir pages/    # check saved text files, no scraping
+```
+
+It never edits `cards.json`. Marketing pages are messy, so you review the report, open any page it flags, then update the data and its `as_of` date yourself. Page addresses are in `data/card_sources.json`. Some issuers block automated visits, and those cards show up as BLOCKED instead of being guessed at. Check each site's terms before you scrape it.
+
 ## Data
 
 - `data/cards.json`: earning rules for 19 popular cards. Card terms change, so check `as_of` and update.

@@ -1,0 +1,22 @@
+{
+  "_note": "Official issuer pages used by `python -m shopwiz.refresh`. Pages move, so a page that fails is reported, not guessed at. URLs marked (unchecked) came from memory and haven't been opened.",
+  "chase-freedom-unlimited": ["https://creditcards.chase.com/cash-back-credit-cards/freedom/unlimited"],
+  "chase-freedom-flex": ["https://creditcards.chase.com/cash-back-credit-cards/freedom/flex"],
+  "chase-sapphire-preferred": ["https://creditcards.chase.com/rewards-credit-cards/sapphire/preferred"],
+  "prime-visa": ["https://creditcards.chase.com/cash-back-credit-cards/amazon-prime-rewards"],
+  "amex-blue-cash-everyday": ["https://www.americanexpress.com/us/credit-cards/card/blue-cash-everyday/"],
+  "amex-blue-cash-preferred": ["https://www.americanexpress.com/us/credit-cards/card/blue-cash-preferred/"],
+  "amex-gold": ["https://www.americanexpress.com/us/credit-cards/card/gold-card/"],
+  "citi-double-cash": ["https://www.citi.com/credit-cards/citi-double-cash-credit-card"],
+  "citi-custom-cash": ["https://www.citi.com/credit-cards/citi-custom-cash-credit-card"],
+  "wells-fargo-active-cash": ["https://www.wellsfargo.com/credit-cards/active-cash/"],
+  "capital-one-savor": ["https://www.capitalone.com/credit-cards/savor-dining-rewards/"],
+  "capital-one-quicksilver": ["https://www.capitalone.com/credit-cards/quicksilver/"],
+  "capital-one-venture": ["https://www.capitalone.com/credit-cards/venture/"],
+  "capital-one-walmart": ["https://www.capitalone.com/credit-cards/walmart-rewards/"],
+  "discover-it": ["https://www.discover.com/credit-cards/cash-back/it-card.html"],
+  "boa-customized-cash": ["https://www.bankofamerica.com/credit-cards/products/cash-back-credit-card/"],
+  "apple-card": ["https://www.apple.com/apple-card/"],
+  "costco-citi": ["https://www.citi.com/credit-cards/citi-costco-anywhere-visa-credit-card"],
+  "target-circle": ["https://www.target.com/circlecard"]
+}
