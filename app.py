@@ -35,14 +35,14 @@ BUNDLE = re.compile(r"\b(bundle|kit|combo|protection plan|with (?:power bank|sta
 
 app = FastAPI(title="ShopWiz")
 
+# Only this site and the portfolio may frame the app (CSP frame-ancestors; X-Frame-Options can't allow a second origin, so it is omitted).
 # The same headers are set in vercel.json for the static files, which Vercel serves without this app.
 SECURITY_HEADERS = {
     "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
                                "font-src https://fonts.gstatic.com; img-src 'self' https: data:; connect-src 'self'; "
-                               "frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+                               "frame-ancestors 'self' https://rhiannaferreira.vercel.app; base-uri 'self'; form-action 'self'",
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "strict-origin-when-cross-origin",
-    "X-Frame-Options": "DENY",
     "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
 }
 
