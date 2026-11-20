@@ -398,3 +398,88 @@ def test_every_card_has_a_source_page_and_the_report_renders(tmp_path):
     refresh.main(["--only", "amex-gold", "citi-double-cash", "--from-dir", str(Path(__file__).parent / "fixtures" / "card_pages"), "--out", str(out)])
     text = out.read_text()
     assert "Amex Gold: OK" in text and "Citi Double Cash: BLOCKED" in text
+
+
+def _day(s):
+    from datetime import date
+    return date.fromisoformat(s)
+
+
+def test_sale_windows_and_focus():
+    from shopwiz import sales
+    today = _day("2026-11-20")
+    by = {s.key: s for s in sales.sales(today)}
+    bf = by["black_friday"]
+    assert (bf.start, bf.peak, bf.end) == (_day("2026-11-20"), _day("2026-11-27"), _day("2026-11-30"))
+    assert bf.status(today) == "live" and by["cyber_monday"].status(today) == "soon"
+    assert sales.focus(today).key == "black_friday"
+    assert sales.focus(_day("2026-12-10")).key == "super_bowl"  # after Cyber Monday, the next big sale
+    assert sales.focus(_day("2026-11-29")).key == "black_friday"  # still live on Sunday, ends before Cyber Monday does
+
+
+def test_sales_never_return_ended_ones():
+    from shopwiz import sales
+    for d in ("2026-01-02", "2026-06-15", "2026-12-31"):
+        assert all(s.end >= _day(d) for s in sales.sales(_day(d)))
+
+
+def test_timeline_marks_past_steps_and_playbook_has_best_for():
+    from shopwiz import sales
+    pb = sales.playbook("black_friday", _day("2026-11-20"))
+    whens = {s["title"]: s["when"] for s in pb["timeline"]}
+    assert whens["Get ready"] == "past" and whens["Early deals open"] == "today" and whens["Last call"] == "next"
+    assert any(c["category"] == "TVs" for c in pb["best_for"]["here"])
+    later = sales.best_for("prime_day")["better_later"]
+    assert any(c["category"] == "headphones and speakers" and c["better_at"] == "Black Friday" for c in later)
+    assert sales.playbook("nope", _day("2026-11-20")) is None
+
+
+def test_run_sheet_orders_buy_now_then_sale_items():
+    from shopwiz import sales
+    s = sales.focus(_day("2026-11-20"))
+    items = [
+        {"id": "w", "title": "Bose", "net_price": 373.32, "verdict": "wait", "merchant": "Best Buy", "target_price": 300, "saves": 40},
+        {"id": "s", "title": "Junk", "net_price": 50, "verdict": "skip", "merchant": "X"},
+        {"id": "b", "title": "Sony", "net_price": 295.49, "verdict": "buy_now", "merchant": "Amazon.com", "saves": 100},
+    ]
+    r = sales.run_sheet(items, s, _day("2026-11-20"))
+    assert [x["id"] for x in r["steps"]] == ["b", "w", "s"]
+    assert r["buy_now_total"] == 295.49 and r["sale_total_if_target"] == 300
+    assert "$300.00 or less" in r["steps"][1]["action"] and r["steps"][1]["buy_by"] <= "2026-11-30"
+
+
+def test_sale_shield_flags_inflated_was_prices():
+    from shopwiz import sales
+    fake = sales.deal_check(199.0, 399.0, [195, 199, 205, 210], [])
+    assert fake["verdict"] == "inflated" and fake["claimed_pct"] == 0.501
+    real = sales.deal_check(199.0, 299.0, [260, 270, 280, 289], [])
+    assert real["verdict"] == "real"
+    hist = [{"d": "2026-11-01", "p": 250}, {"d": "2026-11-08", "p": 245}, {"d": "2026-11-15", "p": 255}]
+    assert sales.deal_check(250.0, None, [250, 252, 255], hist)["verdict"] == "meh"
+    assert sales.deal_check(150.0, 200.0, [], [])["verdict"] == "unknown"
+    cheaper = sales.deal_check(250.0, 300.0, [210, 260, 270], [])
+    assert cheaper["cheaper_elsewhere"] and cheaper["store_low"] == 210
+
+
+def test_calendar_file_is_valid_ics():
+    from shopwiz import sales
+    text = sales.ics([(_day("2026-11-27"), "ShopWiz: Black Friday, Main day", "Re-check, then buy; quickly")])
+    assert text.startswith("BEGIN:VCALENDAR") and "DTSTART;VALUE=DATE:20261127" in text and "DTEND;VALUE=DATE:20261128" in text
+    assert "buy\\; quickly" in text and text.rstrip().endswith("END:VCALENDAR")
+
+
+def test_sale_endpoints():
+    s = client.get("/api/sales").json()
+    assert s["focus"] and s["sales"][0]["status"] in {"live", "soon", "later"}
+    assert client.get("/api/sales/black_friday").status_code == 200 and client.get("/api/sales/nope").status_code == 404
+    ics = client.get("/api/sales/black_friday/reminders.ics")
+    assert ics.status_code == 200 and ics.headers["content-type"].startswith("text/calendar") and "BEGIN:VEVENT" in ics.text
+    plan = client.post("/api/sales/plan", json={"sale": "black_friday", "items": [
+        {"id": "a", "title": "Sony", "net_price": 295.49, "verdict": "buy_now", "merchant": "Amazon.com"}]})
+    assert plan.status_code == 200 and plan.json()["steps"][0]["bucket"] == "now"
+    body = {"catalog_id": "sample-bose-qcu", "title": "Bose QuietComfort Ultra Headphones", "cards": ["chase-freedom-unlimited"],
+            "price": 199.0, "was": 399.0}
+    chk = client.post("/api/sale/check", json=body)
+    assert chk.status_code == 200 and chk.json()["verdict"] in {"real", "good", "meh", "inflated", "unknown"}
+    assert chk.json()["best"]["net_price"] > 0
+    assert client.post("/api/sale/check", json={**body, "price": -5}).status_code == 422

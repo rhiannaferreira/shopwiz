@@ -15,11 +15,11 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from shopwiz import apify, extras, gmail, timing
+from shopwiz import apify, extras, gmail, sales, timing
 from shopwiz.coupons import best_by_store, extract
 from shopwiz.cards import Catalog
 from shopwiz.extras import bonus_note, parse_query, price_match_tip, review_verdict, understand
@@ -313,16 +313,9 @@ def market():
     return {"today": today.isoformat(), "events": timing.upcoming(today, 4)}
 
 
-@app.post("/api/wishlist/check")
-def wishlist_check(req: WishCheck, request: Request):
-    """Prices one wishlist item across stores and says whether to buy now or wait. No review scraping, so it stays cheap."""
+def _buyable(req, request: Request):
+    """Prices a product across stores for your cards. Returns the title, new-condition offers best first, and the offers list."""
     wallet = wallet_or_400(req.cards)
-    for value in (req.need_by, *[h.d for h in req.history]):
-        if value:
-            try:
-                date.fromisoformat(value)
-            except ValueError:
-                raise HTTPException(400, "Dates need the form YYYY-MM-DD.")
     if not live():
         more = sample("offers_more")
         offers = more[req.catalog_id] if req.catalog_id in more else sample("offers")
@@ -337,6 +330,23 @@ def wishlist_check(req: WishCheck, request: Request):
     buyable = [r for r in ranked if r.condition == "new" and not r.needs_membership]
     if not buyable:
         raise HTTPException(404, "No new-condition store prices found for this product.")
+    return title, buyable, offers
+
+
+def _check_dates(*values):
+    for value in values:
+        if value:
+            try:
+                date.fromisoformat(value)
+            except ValueError:
+                raise HTTPException(400, "Dates need the form YYYY-MM-DD.")
+
+
+@app.post("/api/wishlist/check")
+def wishlist_check(req: WishCheck, request: Request):
+    """Prices one wishlist item across stores and says whether to buy now or wait. No review scraping, so it stays cheap."""
+    _check_dates(req.need_by, *[h.d for h in req.history])
+    title, buyable, offers = _buyable(req, request)
     best = buyable[0]
     listing = [{"rating": req.rating, "reviews": req.reviews}] if req.rating and req.reviews else []
     rating = trust_rating(offers + listing if not any(o.get("rating") for o in offers) else offers, None)
@@ -348,6 +358,76 @@ def wishlist_check(req: WishCheck, request: Request):
         "saves": round(req.list_price - best.net_price, 2) if req.list_price and req.list_price > best.net_price else 0,
         "timing": {**t.__dict__, "extras": None},
     }
+
+
+class SaleCheck(DealRequest):
+    price: float = Field(gt=0, le=100000)  # the sale price you're looking at, before your card
+    was: float | None = Field(default=None, gt=0, le=100000)  # the "was" price the ad shows
+    history: list[HistoryPoint] = Field(default_factory=list, max_length=60)
+
+
+@app.post("/api/sale/check")
+def sale_check(req: SaleCheck, request: Request):
+    """Sale Shield: is an advertised discount real? Compares it with other stores now and with your own price history."""
+    _check_dates(*[h.d for h in req.history])
+    _, buyable, _ = _buyable(req, request)
+    out = sales.deal_check(req.price, req.was, [r.net_price for r in buyable], [h.model_dump() for h in req.history])
+    out["best"] = _offer_json(buyable[0])
+    return out
+
+
+class SaleStep(BaseModel):
+    id: str = Field(max_length=60)
+    title: str = Field(max_length=300)
+    net_price: float = Field(ge=0)
+    verdict: str = Field(pattern="^(buy_now|wait|skip)$")
+    merchant: str = Field(max_length=80)
+    target_price: float | None = None
+    wait_until: str | None = Field(default=None, max_length=10)
+    saves: float | None = None
+
+
+class SalePlanRequest(BaseModel):
+    sale: str = Field(max_length=30)
+    items: list[SaleStep] = Field(max_length=40)
+
+
+def _sale_or_404(key: str):
+    match = next((s for s in sales.sales(date.today()) if s.key == key), None)
+    if not match:
+        raise HTTPException(404, "Unknown sale.")
+    return match
+
+
+@app.get("/api/sales")
+def sales_list():
+    today = date.today()
+    return {"today": today.isoformat(), "focus": sales.focus(today).key, "sales": [sales.sale_json(s, today) for s in sales.sales(today)]}
+
+
+@app.get("/api/sales/{key}")
+def sale_playbook(key: str):
+    _sale_or_404(key)
+    return sales.playbook(key, date.today())
+
+
+@app.post("/api/sales/plan")
+def sale_plan(req: SalePlanRequest):
+    """A run sheet for one sale from your checked wishlist. Free: no store lookups."""
+    s = _sale_or_404(req.sale)
+    for it in req.items:
+        _check_dates(it.wait_until)
+    return sales.run_sheet([i.model_dump() for i in req.items], s, date.today())
+
+
+@app.get("/api/sales/{key}/reminders.ics")
+def sale_reminders(key: str):
+    s = _sale_or_404(key)
+    today = date.today()
+    events = [(date.fromisoformat(x["date"]), f"ShopWiz: {s.name}, {x['title']}", x["text"])
+              for x in sales.timeline(s, today) if x["when"] != "past"]
+    return Response(sales.ics(events), media_type="text/calendar",
+                    headers={"Content-Disposition": f'attachment; filename="shopwiz-{key}.ics"'})
 
 
 @app.post("/api/wishlist/plan")

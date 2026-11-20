@@ -30,8 +30,9 @@
     </div>
     <nav class="tabs" role="tablist">
       <button role="tab" id="t-shop" aria-controls="tab-shop" aria-selected="true" data-tab="shop">Shop</button>
+      <button role="tab" id="t-sale" aria-controls="tab-sale" aria-selected="false" data-tab="sale">Sale Day <i class="livedot" id="sale-dot" hidden></i></button>
       <button role="tab" id="t-wish" aria-controls="tab-wish" aria-selected="false" data-tab="wish">Wishlist <span class="count" id="wish-count" hidden></span></button>
-      <button role="tab" id="t-guide" aria-controls="tab-guide" aria-selected="false" data-tab="guide">Card cheat sheet</button>
+      <button role="tab" id="t-guide" aria-controls="tab-guide" aria-selected="false" data-tab="guide">Cheat sheet</button>
     </nav>
     </div>
   </header>
@@ -87,6 +88,29 @@
         <h2 class="section-title"><span class="num">02</span> Here's how to pay least</h2>
         <div id="deal" class="deal"></div>
       </section>
+    </section>
+
+    <section id="tab-sale" role="tabpanel" aria-labelledby="t-sale" hidden>
+      <div class="hero solo">
+        <div class="hero-copy">
+          <p class="kicker">Sale Day</p>
+          <h1>Win the <span class="hl">sale.</span></h1>
+          <p class="lede">Black Friday, Cyber Monday, Presidents Day and the rest. ShopWiz counts down, gets you ready, hands you a plan for the day, and checks whether a discount is real.</p>
+        </div>
+      </div>
+      <div id="sale-chips" class="sale-chips" role="group" aria-label="Pick a sale"></div>
+      <div id="sale-board" class="panel board"></div>
+      <div class="sale-grid">
+        <div id="sale-ready" class="panel ready"></div>
+        <div id="sale-timeline" class="panel timeline"></div>
+      </div>
+      <h2 class="section-title"><span class="num">01</span> Your deal-day plan</h2>
+      <div id="sale-plan"></div>
+      <h2 class="section-title"><span class="num">02</span> What's worth buying at this sale</h2>
+      <div id="sale-best" class="two-col"></div>
+      <h2 class="section-title"><span class="num">03</span> Traps to dodge</h2>
+      <div id="sale-traps" class="traps"></div>
+      <p class="fine wish-fine">Sale dates for Black Friday and Cyber Monday are exact. Amazon's events and the Super Bowl window are approximate until they're announced. Typical discounts are rules of thumb, not promises.</p>
     </section>
 
     <section id="tab-wish" role="tabpanel" aria-labelledby="t-wish" hidden>

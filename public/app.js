@@ -111,6 +111,7 @@ function walletChanged() {
   save();
   renderWallet();
   renderWishCount();
+  api("/api/sales").then((d) => { saleData = d; saleKey = d.focus; $("#sale-dot").hidden = !d.sales.some((s) => s.status === "live"); }).catch(() => {});
   renderTicker();
   if (current) openDeal(current);
   if (!$("#tab-guide").hidden) renderGuide();
@@ -382,6 +383,18 @@ function renderDeal(product, d) {
       <p><small>Stores match identical new items sold by the competitor itself. Show the listing at checkout.</small></p>
     </div>` : "";
 
+  const shield = `
+    <div class="panel shield" style="--i:2">
+      <h3>Sale Shield: is the discount real?</h3>
+      <p class="sub">Spotted a sale? Enter the sale price and the “was” price from the ad. ShopWiz compares them with other stores and your price history.</p>
+      <div class="shield-form">
+        <label class="field">Sale price ($)<input id="sh-price" type="number" min="0" step="0.01" inputmode="decimal" placeholder="${b.price}"></label>
+        <label class="field">“Was” price ($)<input id="sh-was" type="number" min="0" step="0.01" inputmode="decimal" placeholder="optional"></label>
+        <button class="pill strong" id="sh-go" type="button">Check it</button>
+      </div>
+      <div id="sh-out" aria-live="polite"></div>
+    </div>`;
+
   const bonus = d.bonus ? `<div class="panel bonus" style="--i:2"><span class="label">Sign-up bonus</span><p>${esc(d.bonus.text)}</p></div>` : "";
 
   const r = d.rating;
@@ -431,8 +444,9 @@ function renderDeal(product, d) {
   $("#deal").onclick = (e) => {
     copyCode(e.target.closest("[data-code]"));
     if (e.target.closest("#save-wish")) toggleWish(product, b.net_price);
+    if (e.target.closest("#sh-go")) saleShield(product);
   };
-  $("#deal").innerHTML = `${left}<div class="side">${stats}${tip}${bonus}${trust}${owners}${race}</div>`;
+  $("#deal").innerHTML = `${left}<div class="side">${stats}${tip}${shield}${bonus}${trust}${owners}${race}</div>`;
 
   // Choreography: swipe, approve, count down to the real price, fill the bars and gauge.
   setTimeout(() => {
@@ -695,6 +709,207 @@ $("#wish-list").addEventListener("change", (e) => {
   checkAll(it); // the offers are cached for an hour, so this is usually free
 });
 
+
+/* Sale Shield: is an advertised discount real? */
+const SHIELD = {
+  real: ["Real deal", "real"], good: ["Good price", "good"], meh: ["Not a deal", "meh"],
+  inflated: ["Fake discount", "inflated"], unknown: ["Can't tell yet", "meh"],
+};
+async function saleShield(product) {
+  const out = $("#sh-out"), price = Number($("#sh-price").value), was = Number($("#sh-was").value) || null;
+  if (!(price > 0)) { out.innerHTML = `<p class="status error">Enter the sale price you're looking at.</p>`; return; }
+  if (!state.cards.length) { openWallet(); return; }
+  out.innerHTML = `<p class="status">Checking…</p>`;
+  const saved = state.wishlist.find((w) => w.id === wishId(product));
+  try {
+    const r = await api("/api/sale/check", {
+      catalog_id: product.catalog_id || "", product_id: product.product_id || "", title: product.title || "",
+      cards: state.cards, rotating: state.rotating, use_portal: state.portal, members: state.members,
+      coupons: inbox.coupons.filter((c) => c.store_key), price, was, history: saved ? saved.history : [],
+    });
+    const [label, cls] = SHIELD[r.verdict] || SHIELD.unknown;
+    out.innerHTML = `<div class="shield-out ${cls}">
+      <span class="stamp ${cls}">${label}</span><p class="wheadline">${esc(r.headline)}</p>
+      <ul class="wreasons">${r.reasons.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>`;
+  } catch (err) {
+    out.innerHTML = `<p class="status error">${esc(err.message)}</p>`;
+  }
+}
+
+/* Sale Day: countdown, prep checklist, timeline, deal-day plan */
+let saleData = null, saleKey = null, playbook = null, saleTimer = null;
+const gotoTab = (name) => $(`.tabs [data-tab="${name}"]`).click();
+const midnight = (iso) => new Date(iso + "T00:00:00");
+
+function saleStatusLabel(s) {
+  return s.status === "live" ? "Live now" : s.status === "soon" ? "Coming up" : "Later";
+}
+
+function renderSaleChips() {
+  $("#sale-chips").innerHTML = saleData.sales.map((s) => `
+    <button type="button" class="pill${s.key === saleKey ? " on" : ""}" data-sale="${esc(s.key)}" aria-pressed="${s.key === saleKey}">
+      ${s.status === "live" ? `<i class="livedot"></i>` : ""}${esc(s.name)}<small>${fmtDay(s.peak)}</small></button>`).join("");
+  const live = saleData.sales.some((s) => s.status === "live");
+  $("#sale-dot").hidden = !live;
+}
+
+function countTarget(s) {
+  const now = new Date();
+  if (s.status === "live") {
+    return now < midnight(s.peak) ? [midnight(s.peak), "Main day in"] : [new Date(midnight(s.end).getTime() + 864e5), "Sale ends in"];
+  }
+  return [midnight(s.start), "Starts in"];
+}
+
+function renderSaleBoard() {
+  const s = playbook.sale, [, label] = countTarget(s);
+  $("#sale-board").innerHTML = `
+    <div class="board-top">
+      <span class="stamp ${s.status === "live" ? "buy_now" : "wait"}">${saleStatusLabel(s)}</span>
+      <h2 class="board-name">${esc(s.name)}</h2>
+      <span class="fine">${fmtDay(s.start)}${s.end !== s.start ? ` to ${fmtDay(s.end)}` : ""}${s.approx ? " · dates approximate" : ""}</span>
+    </div>
+    <p class="board-blurb">${esc(s.blurb)}</p>
+    <div class="clock" role="timer" aria-label="${esc(label)}">
+      <span class="clock-label">${esc(label)}</span>
+      ${["days", "hours", "min", "sec"].map((u) => `<div class="cell"><b data-u="${u}">--</b><small>${u}</small></div>`).join("")}
+    </div>`;
+  clearInterval(saleTimer);
+  const tick = () => {
+    const [to] = countTarget(playbook.sale);
+    let ms = Math.max(0, to - new Date());
+    const v = { days: Math.floor(ms / 864e5), hours: Math.floor(ms / 36e5) % 24, min: Math.floor(ms / 6e4) % 60, sec: Math.floor(ms / 1e3) % 60 };
+    for (const [u, n] of Object.entries(v)) {
+      const el = $(`#sale-board [data-u="${u}"]`);
+      if (el) el.textContent = String(n).padStart(2, "0");
+    }
+  };
+  tick();
+  saleTimer = setInterval(tick, calm ? 30000 : 1000);
+}
+
+function readiness() {
+  return {
+    cards: state.cards.length > 0, inbox: inbox.coupons.length > 0, wishlist: state.wishlist.length > 0,
+    checked: state.wishlist.some((w) => w.last), budget: !!state.budget,
+  };
+}
+
+function renderReady() {
+  const r = readiness(), list = playbook.checklist, done = list.filter((c) => r[c.id]).length;
+  $("#sale-ready").innerHTML = `
+    <h3>Are you ready?</h3>
+    <div class="ready-top"><div class="ring" style="--p:${(done / list.length) * 100}"><span>${done}/${list.length}</span></div>
+      <p class="sub">${done === list.length ? "You're set. Go get the deals." : "A few minutes now saves money on the day."}</p></div>
+    <ul class="checks">${list.map((c) => `
+      <li class="${r[c.id] ? "done" : ""}"><span class="tick" aria-hidden="true">${r[c.id] ? "✓" : ""}</span>
+        <span><b>${esc(c.title)}</b><small>${esc(c.text)}</small></span>
+        ${r[c.id] ? "" : `<button type="button" class="pill" data-go="${esc(c.id)}">Do it</button>`}</li>`).join("")}</ul>`;
+}
+
+function renderTimeline() {
+  $("#sale-timeline").innerHTML = `<h3>The plan, day by day</h3>
+    <ol class="steps">${playbook.timeline.map((t) => `
+      <li class="${t.when}"><span class="dot"></span><span class="when">${fmtDay(t.date)}${t.when === "today" ? " · today" : ""}</span>
+        <b>${esc(t.title)}</b><small>${esc(t.text)}</small></li>`).join("")}</ol>
+    <a class="pill" href="/api/sales/${esc(saleKey)}/reminders.ics" download>＋ Add reminders to my calendar</a>`;
+}
+
+function renderBest() {
+  const b = playbook.best_for, pct = (x) => Math.round(x * 100);
+  const col = (title, all, extra, empty) => { const rows = all.slice(0, 8); return `<div class="panel"><h3>${title}</h3>${rows.length ? `<ul class="cuts">${rows.map((c) => `
+    <li><span>${esc(c.category)}</span><span class="bar"><i style="width:${Math.min(100, pct(c.typical_cut) * 2.4)}%"></i></span>
+      <b>~${pct(c.typical_cut)}%</b>${extra ? `<small>${esc(extra(c))}</small>` : ""}</li>`).join("")}</ul>${all.length > rows.length ? `<p class="fine">Plus ${all.length - rows.length} more with smaller cuts.</p>` : ""}` : `<p class="sub">${empty}</p>`}</div>`; };
+  $("#sale-best").innerHTML =
+    col("Buy these here", b.here, null, "Nothing stands out for this sale.") +
+    col("Better to wait for another sale", b.better_later, (c) => `${c.better_at} usually beats this (~${pct(c.better_cut)}%)`,
+      "Nothing. This is the best sale of the year for most of what people buy.");
+}
+
+function renderTraps() {
+  $("#sale-traps").innerHTML = playbook.traps.map((t, i) => `
+    <div class="panel trap" style="--i:${i}"><h3>${esc(t.title)}</h3><p class="sub">${esc(t.text)}</p></div>`).join("");
+}
+
+function planText(plan) {
+  const names = { now: "BUY NOW", sale: "BUY AT TARGET", skip: "SKIP" };
+  return `ShopWiz plan for ${plan.sale.name}\n` + plan.steps.map((s) => `- [${names[s.bucket]}] ${s.title}: ${s.action}`).join("\n");
+}
+
+async function renderPlan() {
+  const el = $("#sale-plan"), items = state.wishlist.filter((w) => w.last);
+  if (!items.length) {
+    el.innerHTML = `<div class="panel"><h3>Your plan appears here</h3>
+      <p class="sub">${state.wishlist.length ? "Check your wishlist so ShopWiz knows today's prices." : "Save a few products to your wishlist and ShopWiz will turn them into a plan for the day."}</p>
+      <button class="pill strong" id="plan-go" type="button">${state.wishlist.length ? "Check my wishlist" : "Find something to save"}</button></div>`;
+    $("#plan-go").onclick = () => gotoTab(state.wishlist.length ? "wish" : "shop");
+    return;
+  }
+  el.innerHTML = `<div class="skeleton" style="height:140px"></div>`;
+  try {
+    const plan = await api("/api/sales/plan", {
+      sale: saleKey,
+      items: items.map((w) => ({
+        id: w.id, title: w.title, net_price: w.last.best.net_price, verdict: w.last.timing.verdict, merchant: w.last.best.merchant,
+        target_price: w.last.timing.target_price, wait_until: w.last.timing.wait_until, saves: w.last.saves || 0,
+      })),
+    });
+    const group = (bucket, title) => {
+      const rows = plan.steps.filter((s) => s.bucket === bucket);
+      return rows.length ? `<h3 class="plan-h">${title}</h3>` + rows.map((s, i) => `
+        <div class="panel step ${bucket}" style="--i:${i}">
+          <div><b class="wtitle">${esc(s.title)}</b><p class="sub">${esc(s.action)}</p></div>
+          <span class="trigger">${s.trigger != null && bucket === "sale" ? `<small>Buy at</small>${money(s.trigger)}` : bucket === "now" ? money(s.net_price) : ""}</span>
+        </div>`).join("") : "";
+    };
+    el.innerHTML = `<div class="plan-sums">
+        <div class="stat hot"><b>${money(plan.buy_now_total)}</b><span>to buy today</span></div>
+        ${plan.steps.some((s) => s.bucket === "sale") ? `<div class="stat"><b>${money(plan.sale_total_if_target)}</b><span>if prices hit your targets</span></div>` : ""}</div>
+      ${group("now", "Buy now")}${group("sale", `Buy during ${esc(plan.sale.name)}`)}${group("skip", "Skip")}
+      <div class="plan-actions"><button class="pill" id="plan-copy" type="button">Copy this plan</button></div>`;
+    $("#plan-copy").onclick = async (e) => {
+      try { await navigator.clipboard.writeText(planText(plan)); e.target.textContent = "Copied"; } catch { e.target.textContent = "Couldn't copy"; }
+    };
+  } catch (err) {
+    el.innerHTML = `<p class="status error">${esc(err.message)}</p>`;
+  }
+}
+
+async function loadSale(key) {
+  saleKey = key;
+  renderSaleChips();
+  try {
+    playbook = await api("/api/sales/" + key);
+  } catch (err) {
+    $("#sale-board").innerHTML = `<p class="status error">${esc(err.message)}</p>`;
+    return;
+  }
+  renderSaleBoard(); renderReady(); renderTimeline(); renderBest(); renderTraps();
+  await renderPlan();
+}
+
+async function openSale() {
+  if (!saleData) {
+    try { saleData = await api("/api/sales"); } catch (err) { $("#sale-board").innerHTML = `<p class="status error">${esc(err.message)}</p>`; return; }
+    saleKey = saleData.focus;
+  }
+  await loadSale(saleKey);
+}
+
+$("#sale-chips").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-sale]");
+  if (b) loadSale(b.dataset.sale);
+});
+$("#sale-ready").addEventListener("click", (e) => {
+  const go = e.target.closest("[data-go]")?.dataset.go;
+  if (!go) return;
+  if (go === "cards") openWallet();
+  else if (go === "inbox") { gotoTab("shop"); $("#inbox").scrollIntoView(); }
+  else if (go === "wishlist") { gotoTab("shop"); $("#q").focus(); }
+  else if (go === "checked") gotoTab("wish");
+  else if (go === "budget") { gotoTab("wish"); $("#wish-budget").focus(); }
+});
+
 /* Looks */
 function markSkin() {
   $$(".skins button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.skin === document.documentElement.dataset.skin));
@@ -711,7 +926,10 @@ $$(".tabs button").forEach((btn) => {
   btn.onclick = () => {
     $$(".tabs button").forEach((b) => b.setAttribute("aria-selected", b === btn));
     $("#tab-shop").hidden = btn.dataset.tab !== "shop";
+    $("#tab-sale").hidden = btn.dataset.tab !== "sale";
     $("#tab-wish").hidden = btn.dataset.tab !== "wish";
+    if (btn.dataset.tab !== "sale") clearInterval(saleTimer);
+    if (btn.dataset.tab === "sale") openSale();
     $("#tab-guide").hidden = btn.dataset.tab !== "guide";
     if (btn.dataset.tab === "guide") renderGuide();
     if (btn.dataset.tab === "wish") { renderMarket(); refreshPlan().then(renderWish); renderWish(); }
